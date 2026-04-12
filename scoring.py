@@ -2,7 +2,7 @@ import os
 import requests
 from datetime import datetime, timedelta
 
-# 環境変数の取得
+# 環境変数の取得（Secretで設定したもの）
 NOTION_TOKEN = os.environ['NOTION_TOKEN']
 DATABASE_ID = os.environ['DATABASE_ID']
 
@@ -12,15 +12,23 @@ headers = {
     "Notion-Version": "2022-06-28"
 }
 
-def get_yesterday_data():
-    yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+def get_page_by_date(date_str):
     url = f"https://api.notion.com/v1/databases/{DATABASE_ID}/query"
-    query = {"filter": {"property": "Date", "title": {"equals": yesterday}}}
+    query = {"filter": {"property": "Date", "title": {"equals": date_str}}}
     response = requests.post(url, headers=headers, json=query).json()
     return response['results'][0] if response['results'] else None
 
-def analyze_and_propose(yesterday_page):
-    # カテゴリ設定
+def analyze():
+    yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
+    today = datetime.now().strftime('%Y-%m-%d')
+    
+    y_page = get_page_by_date(yesterday)
+    t_page = get_page_by_date(today)
+    
+    if not y_page or not t_page:
+        print("必要なページが見つかりません。")
+        return
+
     categories = [
         {"prefix": "W", "name": "Wellness"},
         {"prefix": "C", "name": "Communication"},
@@ -28,40 +36,27 @@ def analyze_and_propose(yesterday_page):
         {"prefix": "I", "name": "Input"}
     ]
     
-    unfinished_tasks = []
+    unfinished = []
     for cat in categories:
-        scheduled = [t['name'] for t in yesterday_page['properties'][f"【{cat['prefix']}】予定タスク"]['multi_select']]
-        actual = [t['name'] for t in yesterday_page['properties'][f"【{cat['prefix']}】実績"]['multi_select']]
-        
-        # 予定にあって実績にないものを抽出
-        diff = set(scheduled) - set(actual)
+        props = y_page['properties']
+        sched = [t['name'] for t in props[f"【{cat['prefix']}】予定タスク"]['multi_select']]
+        act = [t['name'] for t in props[f"【{cat['prefix']}】実績"]['multi_select']]
+        diff = set(sched) - set(act)
         for task in diff:
-            unfinished_tasks.append(f"{cat['name']}: {task}")
+            unfinished.append(f"{cat['name']}: {task}")
 
-    # 作戦の組み立て
-    if not unfinished_tasks:
-        proposal = "昨日は完璧な達成でした！この調子で今日もARKを加速させましょう。"
+    # メッセージ作成
+    if not unfinished:
+        msg = "昨日は全タスク達成！完璧です。このリズムを崩さず、今日もARKを加速させましょう。"
     else:
-        task_list = "\n・".join(unfinished_tasks)
-        proposal = f"昨日の残りタスクがあります：\n・{task_list}\nこれらを今日の優先タスク（🔥）に設定し、午前中に片付ける作戦を推奨します。"
+        task_list = "\n・".join(unfinished)
+        msg = f"昨日の未達タスクがあります：\n・{task_list}\nこれらを今日の優先タスクに設定し、優先的に消化しましょう。"
     
-    return proposal
-
-def update_today_proposal(proposal):
-    today = datetime.now().strftime('%Y-%m-%d')
-    # 今日のページを探して更新
-    url = f"https://api.notion.com/v1/databases/{DATABASE_ID}/query"
-    query = {"filter": {"property": "Date", "title": {"equals": today}}}
-    pages = requests.post(url, headers=headers, json=query).json()
-    
-    if pages['results']:
-        page_id = pages['results'][0]['id']
-        update_url = f"https://api.notion.com/v1/pages/{page_id}"
-        data = {"properties": {"AI提案・作戦": {"rich_text": [{"text": {"content": proposal}}]}}}
-        requests.patch(update_url, headers=headers, json=data)
+    # 今日のページに書き込み
+    update_url = f"https://api.notion.com/v1/pages/{t_page['id']}"
+    data = {"properties": {"AI提案・作戦": {"rich_text": [{"text": {"content": msg}}]}}}
+    requests.patch(update_url, headers=headers, json=data)
+    print(f"Update complete: {msg}")
 
 if __name__ == "__main__":
-    yesterday_page = get_yesterday_data()
-    if yesterday_page:
-        proposal = analyze_and_propose(yesterday_page)
-        update_today_proposal(proposal)
+    analyze()
