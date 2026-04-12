@@ -60,9 +60,40 @@ WEEKLY_TEMPLATE = {
 def create_notion_page(date_str, tasks):
     url = "https://api.notion.com/v1/pages"
     
-    # マルチセレクト用のJSON構造を生成するヘルパー関数
     def make_multi_select(task_list):
         return {"multi_select": [{"name": task} for task in task_list]}
+
+    # --- 新規追加：ページ本文（チェックリスト）を作る処理 ---
+    children_blocks = []
+    
+    # カテゴリの表示名（絵文字つきで見やすくしています）
+    categories = [
+        ("W", "🏋️ Wellness"),
+        ("C", "🗣️ Communication"),
+        ("Ca", "💼 Career"),
+        ("I", "📥 Input")
+    ]
+    
+    for key, title in categories:
+        if tasks[key]: # その日にタスクが1つ以上ある場合のみ実行
+            # 見出しブロックを追加
+            children_blocks.append({
+                "object": "block",
+                "type": "heading_2",
+                "heading_2": {
+                    "rich_text": [{"type": "text", "text": {"content": title}}]
+                }
+            })
+            # ToDo（チェックボックス）ブロックを追加
+            for task in tasks[key]:
+                children_blocks.append({
+                    "object": "block",
+                    "type": "to_do",
+                    "to_do": {
+                        "rich_text": [{"type": "text", "text": {"content": task}}],
+                        "checked": False # 初期状態は未チェック
+                    }
+                })
 
     payload = {
         "parent": {"database_id": DATABASE_ID},
@@ -74,7 +105,9 @@ def create_notion_page(date_str, tasks):
             "【C】予定タスク": make_multi_select(tasks["C"]),
             "【Ca】予定タスク": make_multi_select(tasks["Ca"]),
             "【I】予定タスク": make_multi_select(tasks["I"])
-        }
+        },
+        # 本文エリア（children）に作成したブロックリストを渡す
+        "children": children_blocks
     }
     
     response = requests.post(url, json=payload, headers=HEADERS)
@@ -85,7 +118,6 @@ def create_notion_page(date_str, tasks):
         print(response.text)
 
 def main():
-    # 実行日の「次の月曜日」を算出
     today = datetime.now(timezone(timedelta(hours=8))) # シンガポール時間(SGT)
     days_ahead = 0 - today.weekday()
     if days_ahead <= 0:
@@ -94,13 +126,11 @@ def main():
 
     print(f"🚀 SPRING ARK 週次プランナー自動生成を開始します。({next_monday.date()}の週)")
 
-    # 月曜(0)から日曜(6)までの7日分をループで生成
     for i in range(7):
         target_date = next_monday + timedelta(days=i)
         date_str = target_date.strftime("%Y-%m-%d")
         day_index = target_date.weekday()
         
-        # テンプレートからその日のタスクを取得してNotion作成関数に渡す
         tasks = WEEKLY_TEMPLATE[day_index]
         create_notion_page(date_str, tasks)
 
