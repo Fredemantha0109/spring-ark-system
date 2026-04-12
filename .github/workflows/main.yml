@@ -15,9 +15,8 @@ jobs:
           python-version: '3.9'
       - name: Install dependencies
         run: pip install requests
-     - name: Run scoring script
+    - name: Run scoring script
         env:
-          # 右側の名前を、あなたのGitHub Secretsの名前と一致させました
           NOTION_TOKEN: ${{ secrets.NOTION_API_TOKEN }}
           DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
-        run: python scoring.py
+        run: python scoring.py # ここを確実に scoring.py にする
