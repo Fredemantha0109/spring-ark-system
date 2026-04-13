@@ -238,13 +238,17 @@ def render_input_tab(today: str) -> None:
         has_any_task = True
         checked[cat["actual_prop"]] = []
 
+        # Notionの「実績」プロパティから既存の完了タスクを取得
+        saved_actuals = set(get_multiselect_names(page, cat["actual_prop"]))
+
         st.markdown(
             f'<div class="category-card">'
             f'<div class="category-label">{cat["label"]}</div>',
             unsafe_allow_html=True,
         )
         for task in tasks:
-            if st.checkbox(task, key=f"{cat['key']}_{task}"):
+            already_done = task in saved_actuals
+            if st.checkbox(task, value=already_done, key=f"{cat['key']}_{task}"):
                 checked[cat["actual_prop"]].append(task)
         st.markdown("</div>", unsafe_allow_html=True)
 
