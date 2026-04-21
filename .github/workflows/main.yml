@@ -20,3 +20,15 @@ jobs:
           NOTION_TOKEN: ${{ secrets.NOTION_API_TOKEN }}
           DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
         run: python scoring.py
+      - name: Calculate daily scores
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_API_TOKEN }}
+          DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+        run: python calc_score.py
+      - name: Send LINE notification
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_API_TOKEN }}
+          DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
+          LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+        run: python send_line.py
