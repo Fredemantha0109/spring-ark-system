@@ -97,7 +97,7 @@ def calculate_category_score(
 
 # ── Notion API ラッパー ─────────────────────────────────────────────────────
 
-def get_page_by_date(date_str: str) -> dict | None:
+def get_page_by_date(date_str: str) -> dict:
     """指定日付(YYYY-MM-DD)のページを取得。"""
     url = f"https://api.notion.com/v1/databases/{DATABASE_ID}/query"
     payload = {
