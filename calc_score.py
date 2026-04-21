@@ -53,7 +53,7 @@ def is_priority(task_name: str) -> bool:
 def calculate_category_score(
     plan_tasks: list[str],
     actual_tasks: list[str],
-) -> float | None:
+) -> float:
     """
     単一カテゴリのスコアを算出する純関数。
 
