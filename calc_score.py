@@ -134,7 +134,7 @@ def update_page_scores(page_id: str, scores: dict[str, float]) -> None:
 
 # ── メイン処理 ──────────────────────────────────────────────────────────────
 
-def update_scores_for_date(date_str: str) -> dict[str, float:
+def update_scores_for_date(date_str: str) -> dict:
     """
     指定日のページを取得し、4カテゴリのスコアを計算してNotionに書き込む。
 
@@ -147,8 +147,8 @@ def update_scores_for_date(date_str: str) -> dict[str, float:
         return {}
 
     page_id = page["id"]
-    results: dict[str, float ] = {}
-    scores_to_write: dict[str, float] = {}
+    results: dict = {}
+    scores_to_write: dict = {}
 
     for cat in CATEGORIES:
         plan = get_multiselect_names(page, cat["plan_prop"])
