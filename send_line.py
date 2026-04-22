@@ -95,4 +95,6 @@ if __name__ == "__main__":
 😴 睡眠: {sleep if sleep else '-'}h
 🌡 体調: {condition_name}"""
 
+    dashboard_url = f"https://{os.environ.get('SURGE_DOMAIN', '')}"
+    message += f"\n\n📊 詳細レポート\n{dashboard_url}"
     send_line_message(message)

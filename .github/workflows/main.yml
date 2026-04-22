@@ -25,10 +25,20 @@ jobs:
           NOTION_TOKEN: ${{ secrets.NOTION_API_TOKEN }}
           DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
         run: python calc_score.py
+      - name: Install Surge
+        run: npm install -g surge
+      - name: Generate and deploy dashboard
+        env:
+          NOTION_TOKEN: ${{ secrets.NOTION_API_TOKEN }}
+          DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}
+          SURGE_DOMAIN: ${{ secrets.SURGE_DOMAIN }}
+        run: python generate_dashboard.py
       - name: Send LINE notification
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_API_TOKEN }}
           DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
           LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
+          SURGE_DOMAIN: ${{ secrets.SURGE_DOMAIN }}
         run: python send_line.py
