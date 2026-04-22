@@ -115,7 +115,11 @@ def generate_strategy(sleep_val, cond, judge, scores, missed_tasks, weight_val="
             },
             timeout=20
         )
-        text = res.json()["content"][0]["text"].strip()
+        print(f"[DEBUG] Claude API status: {res.status_code}")
+        res_json = res.json()
+        print(f"[DEBUG] Claude API response: {res_json}")
+        text = res_json["content"][0]["text"].strip()
+        print(f"[DEBUG] Claude API text: {text}")
         # JSON部分だけ抽出
         start = text.find("[")
         end   = text.rfind("]") + 1
