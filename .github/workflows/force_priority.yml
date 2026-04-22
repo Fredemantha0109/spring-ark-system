@@ -1,0 +1,27 @@
+name: Force Priority Task
+
+on:
+  repository_dispatch:
+    types: [force_priority]
+
+jobs:
+  force-priority:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: pip install requests
+
+      - name: Run force_priority.py
+        env:
+          NOTION_API_TOKEN: ${{ secrets.NOTION_API_TOKEN }}
+          NOTION_DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
+          TASK_NAME: ${{ github.event.client_payload.task_name }}
+          CATEGORY: ${{ github.event.client_payload.category }}
+        run: python force_priority.py
