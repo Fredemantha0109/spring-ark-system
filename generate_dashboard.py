@@ -153,14 +153,6 @@ for task in plan_i:
     if clean not in [d.lstrip("🔥") for d in done_i]:
         missed_tasks_all.append((clean, "Input"))
 
-ai_note = ""  # 後方互換のため残す
-ai_strategies = generate_strategy(
-    sleep, condition, judge_label,
-    [score_w, score_c, score_ca, score_i],
-    missed_tasks_all[:8],
-    weight_val=weight
-)
-
 # ── 判定（睡眠時間 × 体調）────────────────────────
 def calc_judge(sleep_val, cond):
     s = sleep_val if isinstance(sleep_val, (int, float)) else 0
@@ -174,6 +166,14 @@ def calc_judge(sleep_val, cond):
     return "要注意", "amber"
 
 judge_label, judge_color = calc_judge(sleep, condition)
+
+ai_note = ""  # 後方互換のため残す
+ai_strategies = generate_strategy(
+    sleep, condition, judge_label,
+    [score_w, score_c, score_ca, score_i],
+    missed_tasks_all[:8],
+    weight_val=weight
+)
 
 # ── 過去5日間の優先タスク候補を集計 ──────────────────
 CATEGORIES = {
