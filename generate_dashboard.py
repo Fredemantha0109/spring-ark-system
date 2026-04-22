@@ -98,6 +98,75 @@ def calc_judge(sleep_val, cond):
 
 judge_label, judge_color = calc_judge(sleep, condition)
 
+# ── 過去5日間の優先タスク候補を集計 ──────────────────
+CATEGORIES = {
+    'W':  ('【W】予定タスク',  '【W】実績'),
+    'C':  ('【C】予定タスク',  '【C】実績'),
+    'Ca': ('【Ca】予定タスク', '【Ca】実績'),
+    'I':  ('【I】予定タスク',  '【I】実績'),
+}
+
+def fetch_past_pages(n=5):
+    """過去n日分のページを取得（今日を除く）"""
+    pages_data = []
+    for i in range(1, n + 1):
+        d = (datetime.now(sgt) - timedelta(days=i)).strftime("%Y-%m-%d")
+        _, p = fetch_page(d)
+        if p:
+            pages_data.append((d, p))
+    return pages_data
+
+past_pages = fetch_past_pages(5)
+
+# ① 過去5日で未達回数が最多のタスク
+miss_count = {}   # {(task_name, category): 未達回数}
+for date_str, p in past_pages:
+    for cat, (plan_key, done_key) in CATEGORIES.items():
+        plan = [t["name"] for t in p.get(plan_key, {}).get("multi_select", [])]
+        done = [t["name"] for t in p.get(done_key, {}).get("multi_select", [])]
+        # 🔥を除いた名前で比較
+        plan_clean = [t.lstrip("🔥") for t in plan]
+        done_clean = [t.lstrip("🔥") for t in done]
+        for task in plan_clean:
+            if task not in done_clean:
+                key = (task, cat)
+                miss_count[key] = miss_count.get(key, 0) + 1
+
+candidate_1 = None  # (task_name, category, miss_count)
+if miss_count:
+    top = sorted(miss_count.items(), key=lambda x: -x[1])[0]
+    candidate_1 = (top[0][0], top[0][1], top[1])
+
+# ② 最後に完了した日が最も遠いタスク（過去5日に予定があったもの）
+last_done = {}  # {(task_name, category): 最後に完了した日付文字列}
+for date_str, p in past_pages:
+    for cat, (plan_key, done_key) in CATEGORIES.items():
+        done = [t["name"].lstrip("🔥") for t in p.get(done_key, {}).get("multi_select", [])]
+        plan = [t["name"].lstrip("🔥") for t in p.get(plan_key, {}).get("multi_select", [])]
+        for task in plan:
+            key = (task, cat)
+            if task in done:
+                if key not in last_done or date_str > last_done[key]:
+                    last_done[key] = date_str
+            else:
+                if key not in last_done:
+                    last_done[key] = "never"
+
+candidate_2 = None  # (task_name, category, last_done_date)
+if last_done:
+    # "never" > 日付文字列 なので最も遠い = 最も小さい日付 or never
+    def sort_key(x):
+        return x[1] if x[1] != "never" else "0000-00-00"
+    oldest = sorted(last_done.items(), key=lambda x: sort_key(x))[0]
+    # candidate_1と同じタスクの場合は次点を取得
+    for item in sorted(last_done.items(), key=lambda x: sort_key(x)):
+        if candidate_1 is None or item[0][0] != candidate_1[0]:
+            candidate_2 = (item[0][0], item[0][1], item[1])
+            break
+    if candidate_2 is None and last_done:
+        candidate_2 = (oldest[0][0], oldest[0][1], oldest[1])
+
+
 # ── タスク行HTML生成 ──────────────────────────────
 def task_rows_html(plan_tasks, done_tasks):
     rows = []
@@ -219,6 +288,66 @@ if judge_label == "危険":
         f'  }}catch(e){{btn.textContent="❌ エラー"; btn.disabled=false;}}'
         f'}}'
         f'</script>'
+    )
+
+# ── 優先タスク候補パネルHTML ──────────────────────────
+def make_candidate_card(rank, task_name, category, reason, gh_pat, gh_repo):
+    cat_colors = {
+        "W":  ("text-green-400",  "bg-green-500/10 border-green-500/25",  "WELLNESS"),
+        "C":  ("text-amber-400",  "bg-amber-500/10 border-amber-500/25",  "COMMUNICATION"),
+        "Ca": ("text-rose-400",   "bg-rose-500/10 border-rose-500/25",    "CAREER"),
+        "I":  ("text-sky-400",    "bg-sky-500/10 border-sky-500/25",      "INPUT"),
+    }
+    text_c, badge_cls, cat_label = cat_colors.get(category, ("text-white", "bg-ark-dim", category))
+    fn = f"forcePriority{rank}"
+    return (
+        f'<div class="bg-ark-card border border-ark-border rounded-xl p-3">'
+        f'<div class="flex items-start justify-between gap-2">'
+        f'<div class="flex-1 min-w-0">'
+        f'<div class="flex items-center gap-1.5 mb-1">'
+        f'<span class="text-[9px] font-black {text_c} {badge_cls} border rounded px-1.5 py-0.5">{cat_label}</span>'
+        f'</div>'
+        f'<p class="text-sm font-black text-white truncate">{task_name}</p>'
+        f'<p class="text-[9px] text-ark-muted mt-0.5">{reason}</p>'
+        f'</div>'
+        f'<button onclick="{fn}()" class="flex-shrink-0 bg-amber-500/15 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300 text-[10px] font-black rounded-lg px-3 py-1.5 transition-all cursor-pointer">'
+        f'\U0001f525 \u512a\u5148\u8a2d\u5b9a</button>'
+        f'</div></div>'
+        f'<script>'
+        f'async function {fn}(){{'
+        f'  const btn=event.target;btn.textContent="\u9001\u4fe1\u4e2d...";btn.disabled=true;'
+        f'  try{{'
+        f'    const r=await fetch("https://api.github.com/repos/{gh_repo}/dispatches",{{'
+        f'      method:"POST",'
+        f'      headers:{{"Authorization":"Bearer {gh_pat}","Accept":"application/vnd.github+json","Content-Type":"application/json"}},'
+        f'      body:JSON.stringify({{"event_type":"force_priority","client_payload":{{"task_name":"{task_name}","category":"{category}"}}}}),'
+        f'    }});'
+        f'    if(r.status===204){{btn.textContent="\u2705 \u8ffd\u52a0\u5b8c\u4e86";btn.style.borderColor="#22c55e";btn.style.color="#4ade80";}}'
+        f'    else{{btn.textContent="\u274c \u30a8\u30e9\u30fc";btn.disabled=false;}}'
+        f'  }}catch(e){{btn.textContent="\u274c \u30a8\u30e9\u30fc";btn.disabled=false;}}'
+        f'}}</script>'
+    )
+
+priority_candidates_html = ""
+cards = []
+if candidate_1:
+    reason1 = f"\u904e\u53bb5\u65e5\u9593\u3067{candidate_1[2]}\u56de\u672a\u9054"
+    cards.append(make_candidate_card(1, candidate_1[0], candidate_1[1], reason1, GH_PAT, GH_REPO))
+if candidate_2:
+    last = candidate_2[2] if candidate_2[2] != "never" else "\u671f\u9593\u5185\u672a\u5b8c\u4e86"
+    reason2 = f"\u6700\u7d42\u5b8c\u4e86\u65e5: {last}"
+    cards.append(make_candidate_card(2, candidate_2[0], candidate_2[1], reason2, GH_PAT, GH_REPO))
+
+if cards:
+    priority_candidates_html = (
+        '<div class="bg-ark-card border border-amber-500/20 rounded-2xl p-4 mt-4">'
+        '<div class="flex items-center gap-2 mb-3">'
+        '<svg class="w-4 h-4 text-amber-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>'
+        '<p class="text-[10px] font-black text-amber-400 tracking-[.15em]">PRIORITY CANDIDATES</p>'
+        '</div>'
+        '<div class="flex flex-col gap-2">'
+        + "\n".join(cards) +
+        '</div></div>'
     )
 
 # 判定カラー設定
@@ -416,6 +545,7 @@ html = (
     "        <div class=\"flex flex-col gap-2\">\n"
     + ai_section_inner +
     + system_trigger_html +
+    + priority_candidates_html +
     "\n        </div>\n"
     "      </div>\n"
 
