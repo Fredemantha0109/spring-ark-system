@@ -72,13 +72,13 @@ done_i  = get_tasks("【I】実績")
 
 # 判定
 if score_total >= 80:
-    judge_label = "GOOD"
+    judge_label = "良好"
     judge_color = "green"
 elif score_total >= 50:
-    judge_label = "CAUTION"
+    judge_label = "要注意"
     judge_color = "amber"
 else:
-    judge_label = "ALERT"
+    judge_label = "危険"
     judge_color = "red"
 
 # ── タスク行HTML生成 ──────────────────────────────
@@ -173,15 +173,15 @@ cond_text_c = {"好調": "text-green-400", "普通": "text-amber-400", "不調":
 sleep_c = "text-amber-300" if isinstance(sleep, float) and sleep < 7 else "text-white"
 
 # インジケータードット設定
-good_dot_size     = "w-6 h-6" if judge_label == "GOOD"    else "w-4 h-4"
-caution_dot_size  = "w-6 h-6" if judge_label == "CAUTION" else "w-4 h-4"
-alert_dot_size    = "w-6 h-6" if judge_label == "ALERT"   else "w-4 h-4"
-good_dot_style    = "bg-green-400 shadow-[0_0_14px_rgba(34,197,94,.75)]"    if judge_label == "GOOD"    else "bg-green-500/15 border border-green-500/20"
-caution_dot_style = "bg-amber-400 shadow-[0_0_14px_rgba(251,191,36,.75)]"   if judge_label == "CAUTION" else "bg-amber-500/15 border border-amber-500/20"
-alert_dot_style   = "bg-red-400 shadow-[0_0_14px_rgba(239,68,68,.75)]"      if judge_label == "ALERT"   else "bg-red-500/15 border border-red-500/20"
-good_text_style    = "text-green-400 font-black"  if judge_label == "GOOD"    else "text-green-500/40 font-bold"
-caution_text_style = "text-amber-400 font-black"  if judge_label == "CAUTION" else "text-amber-500/40 font-bold"
-alert_text_style   = "text-red-400 font-black"    if judge_label == "ALERT"   else "text-red-500/40 font-bold"
+good_dot_size     = "w-6 h-6" if judge_label == "\u826f\u597d"   else "w-4 h-4"
+caution_dot_size  = "w-6 h-6" if judge_label == "\u8981\u6ce8\u610f" else "w-4 h-4"
+alert_dot_size    = "w-6 h-6" if judge_label == "\u5371\u967a"   else "w-4 h-4"
+good_dot_style    = "bg-green-400 shadow-[0_0_14px_rgba(34,197,94,.75)]"    if judge_label == "\u826f\u597d"   else "bg-green-500/15 border border-green-500/20"
+caution_dot_style = "bg-amber-400 shadow-[0_0_14px_rgba(251,191,36,.75)]"   if judge_label == "\u8981\u6ce8\u610f" else "bg-amber-500/15 border border-amber-500/20"
+alert_dot_style   = "bg-red-400 shadow-[0_0_14px_rgba(239,68,68,.75)]"      if judge_label == "\u5371\u967a"   else "bg-red-500/15 border border-red-500/20"
+good_text_style    = "text-green-400 font-black"  if judge_label == "\u826f\u597d"   else "text-green-500/40 font-bold"
+caution_text_style = "text-amber-400 font-black"  if judge_label == "\u8981\u6ce8\u610f" else "text-amber-500/40 font-bold"
+alert_text_style   = "text-red-400 font-black"    if judge_label == "\u5371\u967a"   else "text-red-500/40 font-bold"
 
 generated_at = datetime.now(sgt).strftime("%H:%M")
 
@@ -269,15 +269,15 @@ html = (
     "          <div class=\"flex items-end gap-2.5\">\n"
     "            <div class=\"flex flex-col items-center gap-1.5\">\n"
     f"              <div class=\"{good_dot_size} rounded-full {good_dot_style}\"></div>\n"
-    f"              <span class=\"text-[8px] {good_text_style}\">GOOD</span>\n"
+    f"              <span class=\"text-[8px] {good_text_style}\">\u826f\u597d</span>\n"
     "            </div>\n"
     "            <div class=\"flex flex-col items-center gap-1.5\">\n"
     f"              <div class=\"{caution_dot_size} rounded-full {caution_dot_style}\"></div>\n"
-    f"              <span class=\"text-[8px] {caution_text_style}\">CAUTION</span>\n"
+    f"              <span class=\"text-[8px] {caution_text_style}\">\u8981\u6ce8\u610f</span>\n"
     "            </div>\n"
     "            <div class=\"flex flex-col items-center gap-1.5\">\n"
     f"              <div class=\"{alert_dot_size} rounded-full {alert_dot_style}\"></div>\n"
-    f"              <span class=\"text-[8px] {alert_text_style}\">ALERT</span>\n"
+    f"              <span class=\"text-[8px] {alert_text_style}\">\u5371\u967a</span>\n"
     "            </div>\n"
     "          </div>\n"
     "          <div class=\"w-px h-12 bg-ark-border\"></div>\n"
@@ -298,10 +298,6 @@ html = (
     "          <div class=\"bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]\">\n"
     "            <p class=\"text-[9px] text-ark-muted mb-1\">体調</p>\n"
     f"            <p class=\"text-base font-black {cond_text_c}\">{condition}</p>\n"
-    "          </div>\n"
-    "          <div class=\"bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]\">\n"
-    "            <p class=\"text-[9px] text-ark-muted mb-1\">総合</p>\n"
-    f"            <p class=\"text-base font-black {judge_text_c}\">{score_total}点</p>\n"
     "          </div>\n"
     "        </div>\n"
     "      </div>\n"
