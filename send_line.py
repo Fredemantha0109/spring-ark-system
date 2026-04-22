@@ -37,7 +37,7 @@ if __name__ == "__main__":
     
     # 今日の日付(SGT = UTC+8)
     sgt = timezone(timedelta(hours=8))
-    today = datetime.now(sgt).strftime("%Y-%m-%d")
+    today = (datetime.now(sgt) - timedelta(days=1)).strftime("%Y-%m-%d")
     
     # Notionクエリ
     headers = {
