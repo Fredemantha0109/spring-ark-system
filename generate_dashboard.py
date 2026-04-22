@@ -70,10 +70,87 @@ score_total = round((score_w + score_c + score_ca + score_i) / 4)
 weight    = props_today.get("体重", {}).get("number") or "-"
 sleep     = props_today.get("睡眠時間", {}).get("number") or "-"
 condition = (props_today.get("体調", {}).get("select") or {}).get("name", "-")
-ai_note   = ""
-ai_blocks = props_yesterday.get("AI提案・作戦", {}).get("rich_text", [])
-if ai_blocks:
-    ai_note = ai_blocks[0].get("plain_text", "")
+# ── Claude APIで推奨作戦を生成 ──────────────────────
+import json as _json
+
+ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+
+def generate_strategy(sleep_val, cond, judge, scores, missed_tasks, weight_val="-"):
+    """Claude APIで今日の推奨作戦を3つ生成"""
+    if not ANTHROPIC_API_KEY:
+        return []
+    missed_str = "\n".join([f"・{cat}: {task}" for task, cat in missed_tasks]) or "なし"
+    score_str  = f"W:{scores[0]} / C:{scores[1]} / Ca:{scores[2]} / I:{scores[3]}"
+    prompt = f"""あなたはSpring Arkプロジェクトのパーソナルコーチです。
+以下のデータをもとに、今日の具体的な推奨作戦を3つ、JSON形式で出力してください。
+
+【今日のコンディション】
+- 睡眠: {sleep_val}h
+- 体調: {cond}
+- 体重: {weight_val}kg
+- 総合判定: {judge}
+- スコア: {score_str}
+
+【昨日の未達タスク】
+{missed_str}
+
+【出力形式】必ずJSON配列のみ出力してください。他のテキストは一切不要です。
+[
+  {{"title": "作戦タイトル（15文字以内）", "detail": "具体的な行動（30文字以内）"}},
+  {{"title": "作戦タイトル（15文字以内）", "detail": "具体的な行動（30文字以内）"}},
+  {{"title": "作戦タイトル（15文字以内）", "detail": "具体的な行動（30文字以内）"}}
+]"""
+    try:
+        res = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={
+                "x-api-key": ANTHROPIC_API_KEY,
+                "anthropic-version": "2023-06-01",
+                "content-type": "application/json",
+            },
+            json={
+                "model": "claude-haiku-4-5-20251001",
+                "max_tokens": 400,
+                "messages": [{"role": "user", "content": prompt}]
+            },
+            timeout=20
+        )
+        text = res.json()["content"][0]["text"].strip()
+        # JSON部分だけ抽出
+        start = text.find("[")
+        end   = text.rfind("]") + 1
+        if start >= 0 and end > start:
+            return _json.loads(text[start:end])
+    except Exception as e:
+        print(f"[WARN] Claude API error: {e}")
+    return []
+
+# 未達タスクを収集（昨日）
+missed_tasks_all = []
+for task in plan_w:
+    clean = task.lstrip("🔥")
+    if clean not in [d.lstrip("🔥") for d in done_w]:
+        missed_tasks_all.append((clean, "Wellness"))
+for task in plan_c:
+    clean = task.lstrip("🔥")
+    if clean not in [d.lstrip("🔥") for d in done_c]:
+        missed_tasks_all.append((clean, "Communication"))
+for task in plan_ca:
+    clean = task.lstrip("🔥")
+    if clean not in [d.lstrip("🔥") for d in done_ca]:
+        missed_tasks_all.append((clean, "Career"))
+for task in plan_i:
+    clean = task.lstrip("🔥")
+    if clean not in [d.lstrip("🔥") for d in done_i]:
+        missed_tasks_all.append((clean, "Input"))
+
+ai_note = ""  # 後方互換のため残す
+ai_strategies = generate_strategy(
+    sleep, condition, judge_label,
+    [score_w, score_c, score_ca, score_i],
+    missed_tasks_all[:8],
+    weight_val=weight
+)
 
 plan_w  = get_tasks("【W】予定タスク")
 plan_c  = get_tasks("【C】予定タスク")
@@ -247,6 +324,29 @@ if ai_note:
     ai_html = "\n".join(items)
 
 ai_section_inner = ai_html if ai_html else '<p class="text-xs text-ark-muted text-center py-4">昨日の未達タスクなし 🎉</p>'
+
+# ── 推奨作戦パネルHTML ────────────────────────────
+strategy_html = ""
+if ai_strategies:
+    items_html = []
+    for i, s in enumerate(ai_strategies, 1):
+        items_html.append(
+            '<div class="flex items-start gap-3 bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">' +
+            '<span class="w-5 h-5 rounded-full bg-violet-500/25 border border-violet-500/35 text-[9px] font-black text-violet-300 flex items-center justify-center flex-shrink-0 mt-0.5">' + str(i) + '</span>' +
+            '<div><p class="text-xs font-black text-white">' + s.get("title", "") + '</p>' +
+            '<p class="text-[10px] text-ark-muted mt-0.5">' + s.get("detail", "") + '</p></div>' +
+            '</div>'
+        )
+    strategy_html = (
+        '<div class="bg-ark-card border border-violet-500/15 rounded-2xl p-4 mt-4">' +
+        '<div class="flex items-center gap-2 mb-3">' +
+        '<svg class="w-4 h-4 text-violet-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>' +
+        '<p class="text-[10px] font-black text-violet-400 tracking-[.15em]">今日の推奨作戦</p>' +
+        '</div>' +
+        '<div class="flex flex-col gap-2">' +
+        "\n".join(items_html) +
+        '</div></div>'
+    )
 
 # ── SYSTEM TRIGGER（危険時のみ表示）────────────────
 GH_PAT   = os.environ.get("GH_PAT", "")
@@ -544,6 +644,7 @@ html = (
     "        </div>\n"
     "        <div class=\"flex flex-col gap-2\">\n"
     + ai_section_inner
+    + strategy_html
     + system_trigger_html
     + priority_candidates_html +
     "\n        </div>\n"
