@@ -77,7 +77,9 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 
 def generate_strategy(sleep_val, cond, judge, scores, missed_tasks, weight_val="-"):
     """Claude APIで今日の推奨作戦を3つ生成"""
+    print(f"[DEBUG] ANTHROPIC_API_KEY exists: {bool(ANTHROPIC_API_KEY)}, length: {len(ANTHROPIC_API_KEY)}")
     if not ANTHROPIC_API_KEY:
+        print("[DEBUG] ANTHROPIC_API_KEY is empty, skipping")
         return []
     missed_str = "\n".join([f"・{cat}: {task}" for task, cat in missed_tasks]) or "なし"
     score_str  = f"W:{scores[0]} / C:{scores[1]} / Ca:{scores[2]} / I:{scores[3]}"
