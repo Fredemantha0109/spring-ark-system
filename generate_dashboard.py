@@ -199,6 +199,29 @@ alert_text_style   = "text-red-400 font-black"    if judge_label == "\u5371\u967
 
 generated_at = datetime.now(sgt).strftime("%H:%M")
 
+# ── Week番号・Q表示 ───────────────────────────────
+# Spring Ark Week1開始日: 2026-04-06（月）
+PROJECT_START = datetime(2026, 4, 6, tzinfo=sgt)
+target_date   = datetime.strptime(yesterday, "%Y-%m-%d").replace(tzinfo=sgt)
+delta_days    = (target_date - PROJECT_START).days
+week_num      = max(1, delta_days // 7 + 1)
+
+# 四半期
+month = target_date.month
+if month <= 3:
+    quarter, q_start_month = 1, 1
+elif month <= 6:
+    quarter, q_start_month = 2, 4
+elif month <= 9:
+    quarter, q_start_month = 3, 7
+else:
+    quarter, q_start_month = 4, 10
+q_start = datetime(target_date.year, q_start_month, 1, tzinfo=sgt)
+q_day   = (target_date - q_start).days + 1
+
+# 日付表示フォーマット（例: 2026-04-21 · Week 3 · Q2-Day 16）
+header_date = f"{yesterday}\u00a0\u00b7\u00a0Week\u00a0{week_num}\u00a0\u00b7\u00a0Q{quarter}-Day\u00a0{q_day}"
+
 cards_html = (
     category_card("WELLNESS",      "運動・食事・精神",  ICON_W,  "green", score_w,  plan_w,  done_w)  +
     category_card("COMMUNICATION", "英語学習・実践",    ICON_C,  "amber", score_c,  plan_c,  done_c)  +
@@ -266,7 +289,7 @@ html = (
     "        <h1 class=\"text-2xl font-black tracking-tight\">SPRING ARK</h1>\n"
     "        <span class=\"text-xs font-bold text-ark-muted tracking-[.2em] border border-ark-border rounded-full px-2.5 py-0.5\">Daily Dashboard</span>\n"
     "      </div>\n"
-    f"      <p class=\"text-xs text-ark-muted\">{yesterday}</p>\n"
+    f"      <p class=\"text-xs text-ark-muted\">{header_date}</p>\n"
     "    </div>\n"
     f"    <div class=\"inline-flex items-center gap-1.5 bg-{judge_color}-500/10 border border-{judge_color}-500/30 rounded-full px-3 py-1.5\">\n"
     f"      <div class=\"w-1.5 h-1.5 rounded-full bg-{judge_color}-400 animate-pulse-slow\"></div>\n"
