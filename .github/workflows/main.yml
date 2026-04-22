@@ -33,6 +33,7 @@ jobs:
           DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
           SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}
           SURGE_DOMAIN: ${{ secrets.SURGE_DOMAIN }}
+          GH_PAT: ${{ secrets.GH_PAT }}
         run: python generate_dashboard.py
       - name: Send LINE notification
         env:
