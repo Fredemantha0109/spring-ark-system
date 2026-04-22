@@ -543,8 +543,8 @@ html = (
     "          </div>\n"
     "        </div>\n"
     "        <div class=\"flex flex-col gap-2\">\n"
-    + ai_section_inner +
-    + system_trigger_html +
+    + ai_section_inner
+    + system_trigger_html
     + priority_candidates_html +
     "\n        </div>\n"
     "      </div>\n"
