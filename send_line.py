@@ -31,70 +31,77 @@ def send_line_message(message: str) -> bool:
         return False
 
 if __name__ == "__main__":
-    # Notionから今日のデータを取得
     notion_token = os.environ.get("NOTION_TOKEN")
-    database_id = os.environ.get("DATABASE_ID")
-    
-    # 今日の日付(SGT = UTC+8)
-    sgt = timezone(timedelta(hours=8))
-    today = (datetime.now(sgt) - timedelta(days=1)).strftime("%Y-%m-%d")
-    
-    # Notionクエリ
+    database_id  = os.environ.get("DATABASE_ID")
+
+    # 日付(SGT = UTC+8) — 今日・昨日の2ページ使い分け
+    sgt       = timezone(timedelta(hours=8))
+    today     = datetime.now(sgt).strftime("%Y-%m-%d")
+    yesterday = (datetime.now(sgt) - timedelta(days=1)).strftime("%Y-%m-%d")
+
     headers = {
         "Authorization": f"Bearer {notion_token}",
         "Notion-Version": "2022-06-28",
         "Content-Type": "application/json"
     }
-    query = {
-        "filter": {
-            "property": "Date",
-            "title": {"equals": today}
-        }
-    }
-    
-    res = requests.post(
-        f"https://api.notion.com/v1/databases/{database_id}/query",
-        headers=headers,
-        json=query
-    )
-    
-    pages = res.json().get("results", [])
-    if not pages:
-        send_line_message(f"⚠️ {today} のデータが見つかりません")
+
+    def fetch_props(date_str):
+        res = requests.post(
+            f"https://api.notion.com/v1/databases/{database_id}/query",
+            headers=headers,
+            json={"filter": {"property": "Date", "title": {"equals": date_str}}}
+        )
+        results = res.json().get("results", [])
+        return results[0]["properties"] if results else None
+
+    props_today     = fetch_props(today)
+    props_yesterday = fetch_props(yesterday)
+
+    if not props_yesterday:
+        send_line_message(f"⚠️ {yesterday} のデータが見つかりません")
         exit(1)
-    
-    props = pages[0]["properties"]
-    
-    # 各スコアを取得
-    score_total = props.get("総合スコア", {}).get("formula", {}).get("number", 0) or 0
-    score_w = props.get("【W】スコア", {}).get("formula", {}).get("number", 0) or 0
-    score_c = props.get("【C】スコア", {}).get("formula", {}).get("number", 0) or 0
-    score_ca = props.get("【Ca】スコア", {}).get("formula", {}).get("number", 0) or 0
-    score_i = props.get("【I】スコア", {}).get("formula", {}).get("number", 0) or 0
-    weight = props.get("体重", {}).get("number")
-    sleep = props.get("睡眠時間", {}).get("number")
-    condition = props.get("体調", {}).get("select", {})
-    condition_name = condition.get("name", "-") if condition else "-"
-    
-    # 判定絵文字
-    if score_total >= 80:
-        judge = "🟢 GOOD"
-    elif score_total >= 50:
-        judge = "🟡 CAUTION"
+    if not props_today:
+        props_today = props_yesterday
+
+    # スコアは昨日のページから
+    score_total = props_yesterday.get("総合スコア", {}).get("formula", {}).get("number", 0) or 0
+    score_w     = props_yesterday.get("【W】スコア",  {}).get("formula", {}).get("number", 0) or 0
+    score_c     = props_yesterday.get("【C】スコア",  {}).get("formula", {}).get("number", 0) or 0
+    score_ca    = props_yesterday.get("【Ca】スコア", {}).get("formula", {}).get("number", 0) or 0
+    score_i     = props_yesterday.get("【I】スコア",  {}).get("formula", {}).get("number", 0) or 0
+
+    # 体重・睡眠・体調は今日のページから
+    weight         = props_today.get("体重", {}).get("number")
+    sleep_val      = props_today.get("睡眠時間", {}).get("number")
+    condition_obj  = props_today.get("体調", {}).get("select") or {}
+    condition_name = condition_obj.get("name", "-")
+
+    # 判定（睡眠 × 体調）
+    s = sleep_val if isinstance(sleep_val, (int, float)) else 0
+    if (s >= 7 and condition_name in ("好調", "普通")) or (5.5 <= s < 7 and condition_name == "好調"):
+        judge = "🟢 良好"
+    elif (5.5 <= s < 7 and condition_name == "不調") or (s < 5.5 and condition_name in ("普通", "不調")):
+        judge = "🔴 危険"
     else:
-        judge = "🔴 ALERT"
-    
+        judge = "🟡 要注意"
+
     # メッセージ作成
-    message = f"""🌱 Spring Ark Daily Report
-{today} {judge}
+    sleep_str  = f"{sleep_val}h" if sleep_val is not None else "-"
+    weight_str = f"{weight}kg"   if weight    is not None else "-"
 
-📊 総合スコア: {score_total}点
-  W: {score_w} / C: {score_c} / Ca: {score_ca} / I: {score_i}
-
-💪 体重: {weight if weight else '-'}kg
-😴 睡眠: {sleep if sleep else '-'}h
-🌡 体調: {condition_name}"""
+    message = (
+        f"🌱 Spring Ark Daily Report\n"
+        f"{yesterday} {judge}\n"
+        f"\n"
+        f"📊 総合スコア: {score_total}点\n"
+        f"  W: {score_w} / C: {score_c} / Ca: {score_ca} / I: {score_i}\n"
+        f"\n"
+        f"💪 体重: {weight_str}\n"
+        f"😴 睡眠: {sleep_str}\n"
+        f"🌡 体調: {condition_name}"
+    )
 
     dashboard_url = f"https://{os.environ.get('SURGE_DOMAIN', '')}"
     message += f"\n\n📊 詳細レポート\n{dashboard_url}"
+
     send_line_message(message)
