@@ -35,11 +35,13 @@ def fetch_page(date_str):
         json={"filter": {"property": "Date", "title": {"equals": date_str}}}
     )
     results = res.json().get("results", [])
-    return results[0]["properties"] if results else None
+    if not results:
+        return None, None
+    return results[0]["id"], results[0]["properties"]
 
 # ── 今日のページ（体重・睡眠・体調）+ 昨日のページ（スコア・タスク）──
-props_today     = fetch_page(today)
-props_yesterday = fetch_page(yesterday)
+today_page_id,     props_today     = fetch_page(today)
+yesterday_page_id, props_yesterday = fetch_page(yesterday)
 
 if not props_yesterday:
     print(f"[WARN] {yesterday} のページが見つかりません")
@@ -48,7 +50,8 @@ if not props_yesterday:
 # 今日のページが未作成の場合は昨日で代用
 if not props_today:
     print(f"[INFO] {today} のページが未作成のため昨日のデータで代用")
-    props_today = props_yesterday
+    props_today   = props_yesterday
+    today_page_id = yesterday_page_id
 
 # ── データ抽出 ────────────────────────────────────
 def get_score(key):
@@ -175,6 +178,48 @@ if ai_note:
     ai_html = "\n".join(items)
 
 ai_section_inner = ai_html if ai_html else '<p class="text-xs text-ark-muted text-center py-4">昨日の未達タスクなし 🎉</p>'
+
+# ── SYSTEM TRIGGER（危険時のみ表示）────────────────
+GH_PAT   = os.environ.get("GH_PAT", "")
+GH_REPO  = "Fredemantha0109/spring-ark-system"
+
+system_trigger_html = ""
+if judge_label == "危険":
+    system_trigger_html = (
+        '<div class="bg-red-500/8 border border-red-500/25 rounded-2xl p-4 mt-4">'
+        '<div class="flex items-center gap-2 mb-3">'
+        '<svg class="w-4 h-4 text-red-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>'
+        '<p class="text-[10px] font-black text-red-400 tracking-[.15em]">SYSTEM TRIGGER</p>'
+        '</div>'
+        '<div class="bg-red-500/10 border border-red-500/20 rounded-xl px-4 py-3 flex items-center justify-between gap-3">'
+        '<div>'
+        '<div class="flex items-center gap-2 mb-1">'
+        '<p class="text-sm font-black text-white">Shaktiマット リカバリー</p>'
+        '<span class="text-[9px] font-black text-red-400 bg-red-500/20 border border-red-500/30 rounded px-1.5 py-0.5">FORCED</span>'
+        '</div>'
+        '<p class="text-[10px] text-red-300/70">15分・本日必須・スキップ不可</p>'
+        '</div>'
+        f'<button onclick="forceSHakti()" class="flex-shrink-0 bg-red-500/20 hover:bg-red-500/35 border border-red-500/40 text-red-300 text-xs font-black rounded-xl px-4 py-2 transition-all cursor-pointer">'
+        '今日に追加 →</button>'
+        '</div>'
+        '</div>'
+        f'<script>'
+        f'async function forceSHakti(){{'
+        f'  const btn = event.target;'
+        f'  btn.textContent = "送信中...";'
+        f'  btn.disabled = true;'
+        f'  try {{'
+        f'    const res = await fetch("https://api.github.com/repos/{GH_REPO}/dispatches",{{'
+        f'      method:"POST",'
+        f'      headers:{{"Authorization":"Bearer {GH_PAT}","Accept":"application/vnd.github+json","Content-Type":"application/json"}},'
+        f'      body:JSON.stringify({{"event_type":"force_shakti"}})'
+        f'    }});'
+        f'    if(res.status===204){{btn.textContent="✅ 追加完了"; btn.style.borderColor="#22c55e"; btn.style.color="#4ade80";}}'
+        f'    else{{btn.textContent="❌ エラー"; btn.disabled=false;}}'
+        f'  }}catch(e){{btn.textContent="❌ エラー"; btn.disabled=false;}}'
+        f'}}'
+        f'</script>'
+    )
 
 # 判定カラー設定
 judge_colors = {
@@ -370,6 +415,7 @@ html = (
     "        </div>\n"
     "        <div class=\"flex flex-col gap-2\">\n"
     + ai_section_inner +
+    + system_trigger_html +
     "\n        </div>\n"
     "      </div>\n"
 
