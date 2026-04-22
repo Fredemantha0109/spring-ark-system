@@ -23,29 +23,39 @@ HEADERS = {
     "Content-Type": "application/json",
 }
 
-# ── 日付(SGT = UTC+8)で昨日を取得 ──────────────────
+# ── 日付(SGT = UTC+8) ────────────────────────────
 sgt       = timezone(timedelta(hours=8))
+today     = datetime.now(sgt).strftime("%Y-%m-%d")
 yesterday = (datetime.now(sgt) - timedelta(days=1)).strftime("%Y-%m-%d")
 
-# ── Notionからページ取得 ───────────────────────────
-res = requests.post(
-    f"https://api.notion.com/v1/databases/{DATABASE_ID}/query",
-    headers=HEADERS,
-    json={"filter": {"property": "Date", "title": {"equals": yesterday}}}
-)
-pages = res.json().get("results", [])
-if not pages:
+def fetch_page(date_str):
+    res = requests.post(
+        f"https://api.notion.com/v1/databases/{DATABASE_ID}/query",
+        headers=HEADERS,
+        json={"filter": {"property": "Date", "title": {"equals": date_str}}}
+    )
+    results = res.json().get("results", [])
+    return results[0]["properties"] if results else None
+
+# ── 今日のページ（体重・睡眠・体調）+ 昨日のページ（スコア・タスク）──
+props_today     = fetch_page(today)
+props_yesterday = fetch_page(yesterday)
+
+if not props_yesterday:
     print(f"[WARN] {yesterday} のページが見つかりません")
     exit(1)
 
-props = pages[0]["properties"]
+# 今日のページが未作成の場合は昨日で代用
+if not props_today:
+    print(f"[INFO] {today} のページが未作成のため昨日のデータで代用")
+    props_today = props_yesterday
 
 # ── データ抽出 ────────────────────────────────────
 def get_score(key):
-    return props.get(key, {}).get("formula", {}).get("number", 0) or 0
+    return props_yesterday.get(key, {}).get("formula", {}).get("number", 0) or 0
 
 def get_tasks(key):
-    return [t["name"] for t in props.get(key, {}).get("multi_select", [])]
+    return [t["name"] for t in props_yesterday.get(key, {}).get("multi_select", [])]
 
 score_w  = get_score("【W】スコア")
 score_c  = get_score("【C】スコア")
@@ -53,11 +63,12 @@ score_ca = get_score("【Ca】スコア")
 score_i  = get_score("【I】スコア")
 score_total = round((score_w + score_c + score_ca + score_i) / 4)
 
-weight    = props.get("体重", {}).get("number") or "-"
-sleep     = props.get("睡眠時間", {}).get("number") or "-"
-condition = (props.get("体調", {}).get("select") or {}).get("name", "-")
+# 体重・睡眠・体調は今日のページから
+weight    = props_today.get("体重", {}).get("number") or "-"
+sleep     = props_today.get("睡眠時間", {}).get("number") or "-"
+condition = (props_today.get("体調", {}).get("select") or {}).get("name", "-")
 ai_note   = ""
-ai_blocks = props.get("AI提案・作戦", {}).get("rich_text", [])
+ai_blocks = props_yesterday.get("AI提案・作戦", {}).get("rich_text", [])
 if ai_blocks:
     ai_note = ai_blocks[0].get("plain_text", "")
 
@@ -70,16 +81,19 @@ done_c  = get_tasks("【C】実績")
 done_ca = get_tasks("【Ca】実績")
 done_i  = get_tasks("【I】実績")
 
-# 判定
-if score_total >= 80:
-    judge_label = "良好"
-    judge_color = "green"
-elif score_total >= 50:
-    judge_label = "要注意"
-    judge_color = "amber"
-else:
-    judge_label = "危険"
-    judge_color = "red"
+# ── 判定（睡眠時間 × 体調）────────────────────────
+def calc_judge(sleep_val, cond):
+    s = sleep_val if isinstance(sleep_val, (int, float)) else 0
+    # 🟢 良好
+    if (s >= 7 and cond in ("好調", "普通")) or (5.5 <= s < 7 and cond == "好調"):
+        return "良好", "green"
+    # 🔴 危険
+    if (5.5 <= s < 7 and cond == "不調") or (s < 5.5 and cond in ("普通", "不調")):
+        return "危険", "red"
+    # 🟡 要注意（残り全パターン）
+    return "要注意", "amber"
+
+judge_label, judge_color = calc_judge(sleep, condition)
 
 # ── タスク行HTML生成 ──────────────────────────────
 def task_rows_html(plan_tasks, done_tasks):
@@ -283,7 +297,7 @@ html = (
     "          <div class=\"w-px h-12 bg-ark-border\"></div>\n"
     "          <div>\n"
     f"            <p class=\"text-2xl font-black {judge_text_c} leading-none mb-1\">{judge_label}</p>\n"
-    "            <p class=\"text-xs text-ark-muted\">Spring Ark Daily Report</p>\n"
+
     "          </div>\n"
     "        </div>\n"
     "        <div class=\"flex gap-3 sm:ml-auto\">\n"
