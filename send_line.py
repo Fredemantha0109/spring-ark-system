@@ -85,13 +85,13 @@ if __name__ == "__main__":
     else:
         judge = "🟡 要注意"
 
-    # メッセージ作成
+    # メッセージ作成（日付は今日を表示）
     sleep_str  = f"{sleep_val}h" if sleep_val is not None else "-"
     weight_str = f"{weight}kg"   if weight    is not None else "-"
 
     message = (
         f"🌱 Spring Ark Daily Report\n"
-        f"{yesterday} {judge}\n"
+        f"{today} {judge}\n"
         f"\n"
         f"📊 総合スコア: {score_total}点\n"
         f"  W: {score_w} / C: {score_c} / Ca: {score_ca} / I: {score_i}\n"

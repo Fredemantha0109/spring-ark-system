@@ -25,8 +25,11 @@ def analyze():
     y_page = get_page_by_date(yesterday)
     t_page = get_page_by_date(today)
     
-    if not y_page or not t_page:
-        print("必要なページが見つかりません。")
+    if not y_page:
+        print("昨日のページが見つかりません。スキップします。")
+        return
+    if not t_page:
+        print("今日のページがまだ作成されていません。ショートカット実行後に再試行してください。")
         return
 
     categories = [
