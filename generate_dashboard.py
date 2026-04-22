@@ -174,6 +174,8 @@ ai_strategies = generate_strategy(
     missed_tasks_all[:8],
     weight_val=weight
 )
+print(f"[DEBUG] missed_tasks_all: {missed_tasks_all}")
+print(f"[DEBUG] ai_strategies: {ai_strategies}")
 
 # ── 過去5日間の優先タスク候補を集計 ──────────────────
 CATEGORIES = {
