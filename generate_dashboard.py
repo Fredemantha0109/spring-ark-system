@@ -125,6 +125,15 @@ def generate_strategy(sleep_val, cond, judge, scores, missed_tasks, weight_val="
         print(f"[WARN] Claude API error: {e}")
     return []
 
+plan_w  = get_tasks("【W】予定タスク")
+plan_c  = get_tasks("【C】予定タスク")
+plan_ca = get_tasks("【Ca】予定タスク")
+plan_i  = get_tasks("【I】予定タスク")
+done_w  = get_tasks("【W】実績")
+done_c  = get_tasks("【C】実績")
+done_ca = get_tasks("【Ca】実績")
+done_i  = get_tasks("【I】実績")
+
 # 未達タスクを収集（昨日）
 missed_tasks_all = []
 for task in plan_w:
@@ -151,15 +160,6 @@ ai_strategies = generate_strategy(
     missed_tasks_all[:8],
     weight_val=weight
 )
-
-plan_w  = get_tasks("【W】予定タスク")
-plan_c  = get_tasks("【C】予定タスク")
-plan_ca = get_tasks("【Ca】予定タスク")
-plan_i  = get_tasks("【I】予定タスク")
-done_w  = get_tasks("【W】実績")
-done_c  = get_tasks("【C】実績")
-done_ca = get_tasks("【Ca】実績")
-done_i  = get_tasks("【I】実績")
 
 # ── 判定（睡眠時間 × 体調）────────────────────────
 def calc_judge(sleep_val, cond):
