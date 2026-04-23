@@ -77,9 +77,7 @@ ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 
 def generate_strategy(sleep_val, cond, judge, scores, missed_tasks, weight_val="-"):
     """Claude APIで今日の推奨作戦を3つ生成"""
-    print(f"[DEBUG] ANTHROPIC_API_KEY exists: {bool(ANTHROPIC_API_KEY)}, length: {len(ANTHROPIC_API_KEY)}")
     if not ANTHROPIC_API_KEY:
-        print("[DEBUG] ANTHROPIC_API_KEY is empty, skipping")
         return []
     missed_str = "\n".join([f"・{cat}: {task}" for task, cat in missed_tasks]) or "なし"
     score_str  = f"W:{scores[0]} / C:{scores[1]} / Ca:{scores[2]} / I:{scores[3]}"
@@ -117,11 +115,8 @@ def generate_strategy(sleep_val, cond, judge, scores, missed_tasks, weight_val="
             },
             timeout=20
         )
-        print(f"[DEBUG] Claude API status: {res.status_code}")
         res_json = res.json()
-        print(f"[DEBUG] Claude API response: {res_json}")
         text = res_json["content"][0]["text"].strip()
-        print(f"[DEBUG] Claude API text: {text}")
         # JSON部分だけ抽出
         start = text.find("[")
         end   = text.rfind("]") + 1
@@ -180,8 +175,6 @@ ai_strategies = generate_strategy(
     missed_tasks_all[:8],
     weight_val=weight
 )
-print(f"[DEBUG] missed_tasks_all: {missed_tasks_all}")
-print(f"[DEBUG] ai_strategies: {ai_strategies}")
 
 # ── 過去5日間の優先タスク候補を集計 ──────────────────
 CATEGORIES = {
@@ -617,6 +610,10 @@ html = (
     "          <div class=\"bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]\">\n"
     "            <p class=\"text-[9px] text-ark-muted mb-1\">体調</p>\n"
     f"            <p class=\"text-base font-black {cond_text_c}\">{condition}</p>\n"
+    "          </div>\n"
+    "          <div class=\"bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]\">\n"
+    "            <p class=\"text-[9px] text-ark-muted mb-1\">総合</p>\n"
+    f"            <p class=\"text-base font-black {judge_text_c}\">{score_total}<span class=\"text-[9px] font-normal text-ark-muted\">点</span></p>\n"
     "          </div>\n"
     "        </div>\n"
     "      </div>\n"
