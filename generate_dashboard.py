@@ -354,7 +354,12 @@ if CALENDAR_DATABASE_ID:
                 "sorts": [{"property": "\u65e5\u4ed8", "direction": "ascending"}]
             }
         )
-        for page in cal_res.json().get("results", []):
+        cal_data = cal_res.json()
+        print(f"[DEBUG] Calendar status: {cal_res.status_code}")
+        print(f"[DEBUG] Calendar results count: {len(cal_data.get('results', []))}")
+        if cal_data.get('results'):
+            print(f"[DEBUG] First result props: {list(cal_data['results'][0]['properties'].keys())}")
+        for page in cal_data.get("results", []):
             props = page["properties"]
             name = ""
             name_prop = props.get("\u540d\u524d", {})
