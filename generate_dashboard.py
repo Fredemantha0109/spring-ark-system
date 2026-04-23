@@ -554,11 +554,11 @@ for cat_key in ["W", "C", "Ca", "I"]:
 
 # Weekly判定
 if w_score_total >= 80:
-    w_judge_label, w_judge_color = "良好", "green"
+    w_judge_label, w_judge_color = "\U0001f3fb\u7d76\u597d\u8abf", "green"
 elif w_score_total >= 50:
-    w_judge_label, w_judge_color = "要注意", "amber"
+    w_judge_label, w_judge_color = "\U0001f4c8\u6210\u9577\u4e2d", "amber"
 else:
-    w_judge_label, w_judge_color = "危険", "red"
+    w_judge_label, w_judge_color = "\U0001f527\u6539\u5584\u4f59\u5730\u3042\u308a", "red"
 
 w_judge_colors = {
     "green": ("text-green-400", "border-green-500/25"),
