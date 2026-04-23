@@ -80,51 +80,47 @@ def generate_strategy(sleep_val, cond, judge, scores, missed_tasks, weight_val="
     if not ANTHROPIC_API_KEY:
         return []
     missed_str = "\n".join([f"・{cat}: {task}" for task, cat in missed_tasks]) or "なし"
-    score_str  = f"W:{scores[0]} / C:{scores[1]} / Ca:{scores[2]} / I:{scores[3]}"
+    missed_str = "\n".join(list(dict.fromkeys(missed_tasks_w))[:8]) or "なし"
     prompt = f"""あなたはSpring Arkプロジェクトのパーソナルコーチです。
-以下のデータをもとに、今日の具体的な推奨作戦を3つ、JSON形式で出力してください。
+以下の週次データをもとに、分析レポートをJSON形式で出力してください。
 
-【今日のコンディション】
-- 睡眠: {sleep_val}h
-- 体調: {cond}
-- 体重: {weight_val}kg
-- 総合判定: {judge}
-- スコア: {score_str}
+【今週のコンディション】
+- 体重平均: {w_weight_avg}kg
+- 睡眠平均: {w_sleep_avg}h
+- 体調: {w_cond_summary}
+- 週平均スコア: W:{w_score_w} / C:{w_score_c} / Ca:{w_score_ca} / I:{w_score_i} / 総合:{w_score_total}
 
-【昨日の未達タスク】
+【実施できた主なタスク】
+{done_str}
+
+【未達が多かったタスク】
 {missed_str}
 
-【出力形式】必ずJSON配列のみ出力してください。他のテキストは一切不要です。
-[
-  {{"title": "作戦タイトル（15文字以内）", "detail": "具体的な行動（30文字以内）"}},
-  {{"title": "作戦タイトル（15文字以内）", "detail": "具体的な行動（30文字以内）"}},
-  {{"title": "作戦タイトル（15文字以内）", "detail": "具体的な行動（30文字以内）"}}
-]"""
+【出力形式】必ずJSONオブジェクトのみ出力してください。他のテキストは一切不要です。
+{{
+  "summaries": [
+    {{"title": "要点タイトル（15文字以内）", "detail": "具体的分析（40文字以内）"}},
+    {{"title": "要点タイトル（15文字以内）", "detail": "具体的分析（40文字以内）"}},
+    {{"title": "要点タイトル（15文字以内）", "detail": "具体的分析（40文字以内）"}}
+  ],
+  "analysis": "体重・睡眠・体調・完了タスク・未達タスクを総合的に踏まえた今週の評価と来週への提案を200字程度で記載"
+}}"""
+    import json as _j
     try:
         res = requests.post(
             "https://api.anthropic.com/v1/messages",
-            headers={
-                "x-api-key": ANTHROPIC_API_KEY,
-                "anthropic-version": "2023-06-01",
-                "content-type": "application/json",
-            },
-            json={
-                "model": "claude-haiku-4-5-20251001",
-                "max_tokens": 400,
-                "messages": [{"role": "user", "content": prompt}]
-            },
-            timeout=20
+            headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1200, "messages": [{"role": "user", "content": prompt}]},
+            timeout=30
         )
-        res_json = res.json()
-        text = res_json["content"][0]["text"].strip()
-        # JSON部分だけ抽出
-        start = text.find("[")
-        end   = text.rfind("]") + 1
-        if start >= 0 and end > start:
-            return _json.loads(text[start:end])
+        text = res.json()["content"][0]["text"].strip()
+        start_j, end_j = text.find("{"), text.rfind("}") + 1
+        if start_j >= 0 and end_j > start_j:
+            parsed = _j.loads(text[start_j:end_j])
+            return parsed.get("summaries", []), parsed.get("analysis", "")
     except Exception as e:
-        print(f"[WARN] Claude API error: {e}")
-    return []
+        print(f"[WARN] Weekly Claude API error: {e}")
+    return [], ""
 
 plan_w  = get_tasks("【W】予定タスク")
 plan_c  = get_tasks("【C】予定タスク")
@@ -522,7 +518,7 @@ w_score_total = round((w_score_w + w_score_c + w_score_ca + w_score_i) / 4)
 
 # 体重・睡眠・体調の週平均
 w_weights = [p.get("体重", {}).get("number") for _, p in weekly_pages if p.get("体重", {}).get("number")]
-w_sleeps  = [p.get("睑眠時間", {}).get("number") for _, p in weekly_pages if p.get("睑眠時間", {}).get("number")]
+w_sleeps  = [p.get("睡眠時間", {}).get("number") for _, p in weekly_pages if p.get("睡眠時間", {}).get("number")]
 w_conds   = [p.get("体調", {}).get("select", {}) for _, p in weekly_pages]
 w_cond_names = [c.get("name", "") for c in w_conds if c]
 
@@ -531,7 +527,11 @@ w_sleep_avg  = round(sum(w_sleeps)  / len(w_sleeps),  2) if w_sleeps  else "-"
 cond_counts = {}
 for c in w_cond_names:
     cond_counts[c] = cond_counts.get(c, 0) + 1
-w_cond_summary = "・".join([f"{k}:{v}日" for k, v in sorted(cond_counts.items(), key=lambda x: -x[1])]) if cond_counts else "-"
+if cond_counts:
+    top_cond = sorted(cond_counts.items(), key=lambda x: -x[1])[0]
+    w_cond_summary = f"{top_cond[0]}（{top_cond[1]}日）"
+else:
+    w_cond_summary = "-"
 
 # タスク実施回数集計
 task_done_count = {}  # {(task_name, category): count}
@@ -541,11 +541,17 @@ cat_map = {
     "Ca": ("【Ca】実績", "Career"),
     "I":  ("【I】実績",  "Input"),
 }
+import re as _re
+def normalize_task(name):
+    """括弧内（曜日・定着など）を除いてタスク名を正規化"""
+    return _re.sub(r"（[^）]*）", "", name).strip()
+
 for _, p in weekly_pages:
     for cat_key, (done_key, cat_name) in cat_map.items():
         tasks = [t["name"].lstrip("🔥") for t in p.get(done_key, {}).get("multi_select", [])]
         for task in tasks:
-            k = (task, cat_key)
+            normalized = normalize_task(task)
+            k = (normalized, cat_key)
             task_done_count[k] = task_done_count.get(k, 0) + 1
 
 # カテゴリ別にソート（回数多い順）
@@ -573,66 +579,66 @@ w_judge_text_c, w_judge_border = w_judge_colors[w_judge_color]
 def generate_weekly_comment(w_score_w, w_score_c, w_score_ca, w_score_i, w_score_total,
                               w_weight_avg, w_sleep_avg, w_cond_summary, task_done_count):
     if not ANTHROPIC_API_KEY:
-        return []
+        return [], ""
     top_tasks = sorted(task_done_count.items(), key=lambda x: -x[1])[:10]
     done_str = "\n".join([f"\u30fb{t}({c}): {cnt}\u56de" for (t, c), cnt in top_tasks]) or "\u306a\u3057"
     missed_tasks_w = []
     for _, p in weekly_pages:
         for cat_key, (done_key, cat_name) in cat_map.items():
-            plan_key = f"【{cat_key}】予定タスク"
-            plan = [t["name"].lstrip("🔥") for t in p.get(plan_key, {}).get("multi_select", [])]
-            done = [t["name"].lstrip("🔥") for t in p.get(done_key, {}).get("multi_select", [])]
+            plan_key = f"\u3010{cat_key}\u3011\u4e88\u5b9a\u30bf\u30b9\u30af"
+            plan = [t["name"].lstrip("\U0001f525") for t in p.get(plan_key, {}).get("multi_select", [])]
+            done = [t["name"].lstrip("\U0001f525") for t in p.get(done_key, {}).get("multi_select", [])]
             for task in plan:
                 if task not in done:
                     missed_tasks_w.append(f"{cat_name}: {task}")
     missed_str = "\n".join(list(dict.fromkeys(missed_tasks_w))[:8]) or "\u306a\u3057"
-    prompt = f"""あなたはSpring Arkプロジェクトのパーソナルコーチです。
-以下の週次データをもとに、分析コメントを3つ、JSON形式で出力してください。
-
-【今週のコンディション】
-- 体重平均: {w_weight_avg}kg
-- 睑眠平均: {w_sleep_avg}h
-- 体調: {w_cond_summary}
-- 週平均スコア: W:{w_score_w} / C:{w_score_c} / Ca:{w_score_ca} / I:{w_score_i} / 総合:{w_score_total}
-
-【実施できた主なタスク】
-{done_str}
-
-【未達が多かったタスク】
-{missed_str}
-
-【出力形式】必ずJSON配列のみ出力してください。他のテキストは一切不要です。
-[
-  {{"title": "コメントタイトル（15文字以内）", "detail": "具体的な分析や提案（40文字以内）"}},
-  {{"title": "コメントタイトル（15文字以内）", "detail": "具体的な分析や提案（40文字以内）"}},
-  {{"title": "コメントタイトル（15文字以内）", "detail": "具体的な分析や提案（40文字以内）"}}
-]"""
+    prompt = (
+        "\u3042\u306a\u305f\u306fSpring Ark\u30d7\u30ed\u30b8\u30a7\u30af\u30c8\u306e\u30d1\u30fc\u30bd\u30ca\u30eb\u30b3\u30fc\u30c1\u3067\u3059\u3002\n"
+        "\u4ee5\u4e0b\u306e\u9031\u6b21\u30c7\u30fc\u30bf\u3092\u3082\u3068\u306b\u3001\u5206\u6790\u30ec\u30dd\u30fc\u30c8\u3092JSON\u5f62\u5f0f\u3067\u51fa\u529b\u3057\u3066\u304f\u3060\u3055\u3044\u3002\n\n"
+        f"\u3010\u4eca\u9031\u306e\u30b3\u30f3\u30c7\u30a3\u30b7\u30e7\u30f3\u3011\n"
+        f"- \u4f53\u91cd\u5e73\u5747: {w_weight_avg}kg\n"
+        f"- \u7751\u7720\u5e73\u5747: {w_sleep_avg}h\n"
+        f"- \u4f53\u8abf: {w_cond_summary}\n"
+        f"- \u9031\u5e73\u5747\u30b9\u30b3\u30a2: W:{w_score_w} / C:{w_score_c} / Ca:{w_score_ca} / I:{w_score_i} / \u7dcf\u5408:{w_score_total}\n\n"
+        f"\u3010\u5b9f\u65bd\u3067\u304d\u305f\u4e3b\u306a\u30bf\u30b9\u30af\u3011\n{done_str}\n\n"
+        f"\u3010\u672a\u9054\u304c\u591a\u304b\u3063\u305f\u30bf\u30b9\u30af\u3011\n{missed_str}\n\n"
+        "\u3010\u51fa\u529b\u5f62\u5f0f\u3011\u5fc5\u305aJSON\u30aa\u30d6\u30b8\u30a7\u30af\u30c8\u306e\u307f\u51fa\u529b\u3057\u3066\u304f\u3060\u3055\u3044\u3002\u4ed6\u306e\u30c6\u30ad\u30b9\u30c8\u306f\u4e00\u5207\u4e0d\u8981\u3002\n"
+        "{\n"
+        '  "summaries": [\n'
+        '    {"title": "\u8981\u70b9\u30bf\u30a4\u30c8\u30eb\uff0815\u6587\u5b57\u4ee5\u5185\uff09", "detail": "\u5177\u4f53\u7684\u5206\u6790\uff0840\u6587\u5b57\u4ee5\u5185\uff09"},\n'
+        '    {"title": "\u8981\u70b9\u30bf\u30a4\u30c8\u30eb\uff0815\u6587\u5b57\u4ee5\u5185\uff09", "detail": "\u5177\u4f53\u7684\u5206\u6790\uff0840\u6587\u5b57\u4ee5\u5185\uff09"},\n'
+        '    {"title": "\u8981\u70b9\u30bf\u30a4\u30c8\u30eb\uff0815\u6587\u5b57\u4ee5\u5185\uff09", "detail": "\u5177\u4f53\u7684\u5206\u6790\uff0840\u6587\u5b57\u4ee5\u5185\uff09"}\n'
+        "  ],\n"
+        '  "analysis": "\u4f53\u91cd\u30fb\u7751\u7720\u30fb\u4f53\u8abf\u30fb\u5b8c\u4e86\u30bf\u30b9\u30af\u30fb\u672a\u9054\u30bf\u30b9\u30af\u3092\u7d5c\u5408\u7684\u306b\u8e0f\u307e\u3048\u305f\u4eca\u9031\u306e\u7dcf\u5408\u8a55\u4fa1\u30fb\u8003\u5bdf\u30fb\u6539\u5584\u63d0\u6848\u3092200\u5b57\u7a0b\u5ea6\u3067\u8a18\u8f09\u3002\u6b21\u9031\u3078\u306e\u5177\u4f53\u7684\u30a2\u30af\u30b7\u30e7\u30f3\u3082\u542b\u3081\u308b\u3053\u3068\u3002"\n'
+        "}"
+    )
     import json as _j
     try:
         res = requests.post(
             "https://api.anthropic.com/v1/messages",
             headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 600, "messages": [{"role": "user", "content": prompt}]},
-            timeout=25
+            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1200, "messages": [{"role": "user", "content": prompt}]},
+            timeout=30
         )
         text = res.json()["content"][0]["text"].strip()
-        start, end = text.find("["), text.rfind("]") + 1
-        if start >= 0 and end > start:
-            return _j.loads(text[start:end])
+        start_j, end_j = text.find("{"), text.rfind("}") + 1
+        if start_j >= 0 and end_j > start_j:
+            parsed = _j.loads(text[start_j:end_j])
+            return parsed.get("summaries", []), parsed.get("analysis", "")
     except Exception as e:
         print(f"[WARN] Weekly Claude API error: {e}")
-    return []
+    return [], ""
 
-weekly_comments = generate_weekly_comment(
+weekly_summaries, weekly_analysis = generate_weekly_comment(
     w_score_w, w_score_c, w_score_ca, w_score_i, w_score_total,
     w_weight_avg, w_sleep_avg, w_cond_summary, task_done_count
 )
 
 # Weekly右側コメントHTML
 weekly_comment_html = ""
-if weekly_comments:
+if weekly_summaries or weekly_analysis:
     items = []
-    for i, s in enumerate(weekly_comments, 1):
+    for i, s in enumerate(weekly_summaries, 1):
         items.append(
             f'<div class="flex items-start gap-3 bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">'
             f'<span class="w-5 h-5 rounded-full bg-violet-500/25 border border-violet-500/35 text-[9px] font-black text-violet-300 flex items-center justify-center flex-shrink-0 mt-0.5">{i}</span>'
@@ -640,13 +646,19 @@ if weekly_comments:
             f'<p class="text-[10px] text-ark-muted mt-0.5">{s.get("detail","")}</p></div>'
             f'</div>'
         )
+    analysis_html = (
+        f'<div class="bg-ark-dim/30 border border-ark-border rounded-xl px-3 py-3 mt-1">'
+        f'<p class="text-[10px] font-black text-violet-400 mb-1.5">総合分析</p>'
+        f'<p class="text-xs text-white/75 leading-relaxed">{weekly_analysis}</p>'
+        f'</div>'
+    ) if weekly_analysis else ""
     weekly_comment_html = (
         '<div class="stripe bg-ark-card border border-violet-500/20 rounded-2xl p-4 glow-violet">'
         '<div class="flex items-center gap-2 mb-4">'
         '<svg class="w-4 h-4 text-violet-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>'
         '<p class="text-[10px] font-black text-violet-400 tracking-[.15em]">AI 週次分析</p>'
         '</div>'
-        '<div class="flex flex-col gap-2">' + "\n".join(items) + '</div>'
+        '<div class="flex flex-col gap-2">' + "\n".join(items) + analysis_html + '</div>'
         '</div>'
     )
 else:
