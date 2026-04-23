@@ -79,48 +79,40 @@ def generate_strategy(sleep_val, cond, judge, scores, missed_tasks, weight_val="
     """Claude APIで今日の推奨作戦を3つ生成"""
     if not ANTHROPIC_API_KEY:
         return []
-    missed_str = "\n".join([f"・{cat}: {task}" for task, cat in missed_tasks]) or "なし"
-    missed_str = "\n".join(list(dict.fromkeys(missed_tasks_w))[:8]) or "なし"
-    prompt = f"""あなたはSpring Arkプロジェクトのパーソナルコーチです。
-以下の週次データをもとに、分析レポートをJSON形式で出力してください。
-
-【今週のコンディション】
-- 体重平均: {w_weight_avg}kg
-- 睡眠平均: {w_sleep_avg}h
-- 体調: {w_cond_summary}
-- 週平均スコア: W:{w_score_w} / C:{w_score_c} / Ca:{w_score_ca} / I:{w_score_i} / 総合:{w_score_total}
-
-【実施できた主なタスク】
-{done_str}
-
-【未達が多かったタスク】
-{missed_str}
-
-【出力形式】必ずJSONオブジェクトのみ出力してください。他のテキストは一切不要です。
-{{
-  "summaries": [
-    {{"title": "要点タイトル（15文字以内）", "detail": "具体的分析（40文字以内）"}},
-    {{"title": "要点タイトル（15文字以内）", "detail": "具体的分析（40文字以内）"}},
-    {{"title": "要点タイトル（15文字以内）", "detail": "具体的分析（40文字以内）"}}
-  ],
-  "analysis": "体重・睡眠・体調・完了タスク・未達タスクを総合的に踏まえた今週の評価と来週への提案を200字程度で記載"
-}}"""
+    missed_str = "\n".join([f"\u30fb{cat}: {task}" for task, cat in missed_tasks]) or "\u306a\u3057"
+    score_str  = f"W:{scores[0]} / C:{scores[1]} / Ca:{scores[2]} / I:{scores[3]}"
+    prompt = (
+        "\u3042\u306a\u305f\u306fSpring Ark\u30d7\u30ed\u30b8\u30a7\u30af\u30c8\u306e\u30d1\u30fc\u30bd\u30ca\u30eb\u30b3\u30fc\u30c1\u3067\u3059\u3002\n"
+        "\u4ee5\u4e0b\u306e\u30c7\u30fc\u30bf\u3092\u3082\u3068\u306b\u3001\u4eca\u65e5\u306e\u5177\u4f53\u7684\u306a\u63a8\u5968\u4f5c\u6226\u30923\u3064\u3001JSON\u5f62\u5f0f\u3067\u51fa\u529b\u3057\u3066\u304f\u3060\u3055\u3044\u3002\n\n"
+        f"\u3010\u4eca\u65e5\u306e\u30b3\u30f3\u30c7\u30a3\u30b7\u30e7\u30f3\u3011\n"
+        f"- \u7751\u7720: {sleep_val}h\n"
+        f"- \u4f53\u8abf: {cond}\n"
+        f"- \u4f53\u91cd: {weight_val}kg\n"
+        f"- \u7dcf\u5408\u5224\u5b9a: {judge}\n"
+        f"- \u30b9\u30b3\u30a2: {score_str}\n\n"
+        f"\u3010\u6628\u65e5\u306e\u672a\u9054\u30bf\u30b9\u30af\u3011\n{missed_str}\n\n"
+        "\u3010\u51fa\u529b\u5f62\u5f0f\u3011\u5fc5\u305aJSON\u914d\u5217\u306e\u307f\u51fa\u529b\u3057\u3066\u304f\u3060\u3055\u3044\u3002\u4ed6\u306e\u30c6\u30ad\u30b9\u30c8\u306f\u4e00\u5207\u4e0d\u8981\u3002\n"
+        '[\n'
+        '  {"title": "\u4f5c\u6226\u30bf\u30a4\u30c8\u30eb\uff0815\u6587\u5b57\u4ee5\u5185\uff09", "detail": "\u5177\u4f53\u7684\u306a\u884c\u52d5\uff0830\u6587\u5b57\u4ee5\u5185\uff09"},\n'
+        '  {"title": "\u4f5c\u6226\u30bf\u30a4\u30c8\u30eb\uff0815\u6587\u5b57\u4ee5\u5185\uff09", "detail": "\u5177\u4f53\u7684\u306a\u884c\u52d5\uff0830\u6587\u5b57\u4ee5\u5185\uff09"},\n'
+        '  {"title": "\u4f5c\u6226\u30bf\u30a4\u30c8\u30eb\uff0815\u6587\u5b57\u4ee5\u5185\uff09", "detail": "\u5177\u4f53\u7684\u306a\u884c\u52d5\uff0830\u6587\u5b57\u4ee5\u5185\uff09"}\n'
+        ']'
+    )
     import json as _j
     try:
         res = requests.post(
             "https://api.anthropic.com/v1/messages",
             headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1200, "messages": [{"role": "user", "content": prompt}]},
-            timeout=30
+            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 400, "messages": [{"role": "user", "content": prompt}]},
+            timeout=20
         )
         text = res.json()["content"][0]["text"].strip()
-        start_j, end_j = text.find("{"), text.rfind("}") + 1
-        if start_j >= 0 and end_j > start_j:
-            parsed = _j.loads(text[start_j:end_j])
-            return parsed.get("summaries", []), parsed.get("analysis", "")
+        start, end = text.find("["), text.rfind("]") + 1
+        if start >= 0 and end > start:
+            return _j.loads(text[start:end])
     except Exception as e:
-        print(f"[WARN] Weekly Claude API error: {e}")
-    return [], ""
+        print(f"[WARN] Claude API error: {e}")
+    return []
 
 plan_w  = get_tasks("【W】予定タスク")
 plan_c  = get_tasks("【C】予定タスク")
