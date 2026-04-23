@@ -534,9 +534,16 @@ cat_map = {
     "I":  ("【I】実績",  "Input"),
 }
 import re as _re
+TASK_ALIASES = {
+    "\u30e9\u30a4\u30a2\u30f3": "\u52d5\u753b\u8996\u8074",
+    "Soccer":    "\u52d5\u753b\u8996\u8074",
+    "Scrambled": "\u52d5\u753b\u8996\u8074",
+    "Youtube":   "\u52d5\u753b\u8996\u8074",
+}
 def normalize_task(name):
-    """括弧内（曜日・定着など）を除いてタスク名を正規化"""
-    return _re.sub(r"（[^）]*）", "", name).strip()
+    """括弧内（曜日・定着など）を除いてタスク名を正規化、エイリアスを統合"""
+    base = _re.sub(r"\uff08[^\uff09]*\uff09", "", name).strip()
+    return TASK_ALIASES.get(base, base)
 
 for _, p in weekly_pages:
     for cat_key, (done_key, cat_name) in cat_map.items():
@@ -558,7 +565,7 @@ if w_score_total >= 80:
 elif w_score_total >= 50:
     w_judge_label, w_judge_color = "\U0001f4c8\u6210\u9577\u4e2d", "amber"
 else:
-    w_judge_label, w_judge_color = "\U0001f527\u6539\u5584\u4f59\u5730\u3042\u308a", "red"
+    w_judge_label, w_judge_color = "\U0001f527\u8981\u6539\u5584", "red"
 
 w_judge_colors = {
     "green": ("text-green-400", "border-green-500/25"),
@@ -873,12 +880,12 @@ html = (
     + f'<div class="bg-ark-card border ' + w_judge_border + ' rounded-2xl p-5 glow-amber"><div class="flex flex-col sm:flex-row sm:items-center gap-5">'
     + '<div class="flex items-center gap-4">'
     + '<div class="flex items-end gap-2.5">'
-    + f'<div class="flex flex-col items-center gap-1.5"><div class="{"w-6 h-6" if w_judge_label == "良好" else "w-4 h-4"} rounded-full {"bg-green-400 shadow-[0_0_14px_rgba(34,197,94,.75)]" if w_judge_label == "良好" else "bg-green-500/15 border border-green-500/20"}"></div><span class="text-[8px] {"text-green-400 font-black" if w_judge_label == "良好" else "text-green-500/40 font-bold"}">良好</span></div>'
-    + f'<div class="flex flex-col items-center gap-1.5"><div class="{"w-6 h-6" if w_judge_label == "要注意" else "w-4 h-4"} rounded-full {"bg-amber-400 shadow-[0_0_14px_rgba(251,191,36,.75)]" if w_judge_label == "要注意" else "bg-amber-500/15 border border-amber-500/20"}"></div><span class="text-[8px] {"text-amber-400 font-black" if w_judge_label == "要注意" else "text-amber-500/40 font-bold"}">要注意</span></div>'
-    + f'<div class="flex flex-col items-center gap-1.5"><div class="{"w-6 h-6" if w_judge_label == "危険" else "w-4 h-4"} rounded-full {"bg-red-400 shadow-[0_0_14px_rgba(239,68,68,.75)]" if w_judge_label == "危険" else "bg-red-500/15 border border-red-500/20"}"></div><span class="text-[8px] {"text-red-400 font-black" if w_judge_label == "危険" else "text-red-500/40 font-bold"}">危険</span></div>'
+    + f'<div class="flex flex-col items-center gap-1.5"><div class="{"w-6 h-6" if w_judge_label == "🏻絶好調" else "w-4 h-4"} rounded-full {"bg-green-400 shadow-[0_0_14px_rgba(34,197,94,.75)]" if w_judge_label == "🏻絶好調" else "bg-green-500/15 border border-green-500/20"}"></div><span class="text-[8px] {"text-green-400 font-black" if w_judge_label == "🏻絶好調" else "text-green-500/40 font-bold"}">絶好調</span></div>'
+    + f'<div class="flex flex-col items-center gap-1.5"><div class="{"w-6 h-6" if w_judge_label == "📈成長中" else "w-4 h-4"} rounded-full {"bg-amber-400 shadow-[0_0_14px_rgba(251,191,36,.75)]" if w_judge_label == "📈成長中" else "bg-amber-500/15 border border-amber-500/20"}"></div><span class="text-[8px] {"text-amber-400 font-black" if w_judge_label == "📈成長中" else "text-amber-500/40 font-bold"}">成長中</span></div>'
+    + f'<div class="flex flex-col items-center gap-1.5"><div class="{"w-6 h-6" if w_judge_label == "🔧要改善" else "w-4 h-4"} rounded-full {"bg-red-400 shadow-[0_0_14px_rgba(239,68,68,.75)]" if w_judge_label == "🔧要改善" else "bg-red-500/15 border border-red-500/20"}"></div><span class="text-[8px] {"text-red-400 font-black" if w_judge_label == "🔧要改善" else "text-red-500/40 font-bold"}">要改善</span></div>'
     + '</div>'
     + '<div class="w-px h-12 bg-ark-border"></div>'
-    + f'<div><p class="text-2xl font-black {w_judge_text_c} leading-none mb-1">{w_judge_label}</p><p class="text-xs text-ark-muted">7日間平均</p></div>'
+    + f'<div><p class="text-2xl font-black {w_judge_text_c} leading-none">{w_judge_label}</p></div>'
     + '</div>'
     + f'<div class="flex gap-3 sm:ml-auto"><div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-[9px] text-ark-muted mb-1">体重平均</p><p class="text-base font-black text-white">' + str(w_weight_avg) + '<span class="text-[9px] font-normal text-ark-muted">kg</span></p></div>'
     + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-[9px] text-ark-muted mb-1">睡眠平均</p><p class="text-base font-black text-amber-300">' + str(w_sleep_avg) + '<span class="text-[9px] font-normal">h</span></p></div>'
