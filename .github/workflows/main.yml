@@ -27,6 +27,12 @@ jobs:
         run: python calc_score.py
       - name: Install Surge
         run: npm install -g surge
+      - name: Check secrets
+        env:
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+        run: |
+          echo "KEY_LENGTH=${#ANTHROPIC_API_KEY}"
+          echo "KEY_PREFIX=${ANTHROPIC_API_KEY:0:10}"
       - name: Generate and deploy dashboard
         env:
           NOTION_TOKEN: ${{ secrets.NOTION_API_TOKEN }}
@@ -35,6 +41,7 @@ jobs:
           SURGE_DOMAIN: ${{ secrets.SURGE_DOMAIN }}
           GH_PAT: ${{ secrets.GH_PAT }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          CALENDAR_DATABASE_ID: ${{ secrets.CALENDAR_DATABASE_ID }}
         run: python generate_dashboard.py
       - name: Send LINE notification
         env:

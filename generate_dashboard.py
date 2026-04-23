@@ -12,10 +12,11 @@ import requests
 from datetime import datetime, timezone, timedelta
 
 # ── 環境変数 ──────────────────────────────────────
-NOTION_TOKEN  = os.environ["NOTION_TOKEN"]
-DATABASE_ID   = os.environ["DATABASE_ID"]
-SURGE_TOKEN   = os.environ["SURGE_TOKEN"]
-SURGE_DOMAIN  = os.environ["SURGE_DOMAIN"]
+NOTION_TOKEN        = os.environ["NOTION_TOKEN"]
+DATABASE_ID         = os.environ["DATABASE_ID"]
+SURGE_TOKEN         = os.environ["SURGE_TOKEN"]
+SURGE_DOMAIN        = os.environ["SURGE_DOMAIN"]
+CALENDAR_DATABASE_ID = os.environ.get("CALENDAR_DATABASE_ID", "")
 
 HEADERS = {
     "Authorization": f"Bearer {NOTION_TOKEN}",
@@ -338,6 +339,71 @@ if ai_strategies:
     )
 
 # ── SYSTEM TRIGGER（危険時のみ表示）────────────────
+# ── カレンダーDB取得 ──────────────────────────────
+calendar_events = []
+if CALENDAR_DATABASE_ID:
+    try:
+        cal_res = requests.post(
+            f"https://api.notion.com/v1/databases/{CALENDAR_DATABASE_ID}/query",
+            headers=HEADERS,
+            json={
+                "filter": {
+                    "property": "\u65e5\u4ed8",
+                    "date": {"on_or_after": today, "on_or_before": today}
+                },
+                "sorts": [{"property": "\u65e5\u4ed8", "direction": "ascending"}]
+            }
+        )
+        for page in cal_res.json().get("results", []):
+            props = page["properties"]
+            name = ""
+            name_prop = props.get("\u540d\u524d", {})
+            if name_prop.get("title"):
+                name = name_prop["title"][0].get("plain_text", "")
+            date_prop = props.get("\u65e5\u4ed8", {}).get("date", {}) or {}
+            start = date_prop.get("start", "")
+            end   = date_prop.get("end", "")
+            # 時刻部分だけ抽出（日付のみの場合はスキップ）
+            if "T" in start:
+                start_time = start[11:16]  # HH:MM
+                end_time   = end[11:16] if end and "T" in end else ""
+                if name:
+                    calendar_events.append({"name": name, "start": start_time, "end": end_time})
+    except Exception as e:
+        print(f"[WARN] Calendar fetch error: {e}")
+
+# カレンダーHTML
+calendar_html = ""
+if calendar_events:
+    rows = []
+    for ev in calendar_events:
+        duration = ""
+        if ev["end"]:
+            try:
+                sh, sm = int(ev["start"][:2]), int(ev["start"][3:])
+                eh, em = int(ev["end"][:2]),   int(ev["end"][3:])
+                mins = (eh * 60 + em) - (sh * 60 + sm)
+                duration = f"{mins}\u5206" if mins > 0 else ""
+            except:
+                pass
+        rows.append(
+            f'<div class="flex items-center gap-3 bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2">'
+            f'<span class="text-[11px] font-black text-sky-400 w-10 flex-shrink-0">{ev["start"]}</span>'
+            f'<div class="w-px h-4 bg-ark-border flex-shrink-0"></div>'
+            f'<p class="text-xs text-white/85 flex-1">{ev["name"]}</p>'
+            f'<span class="text-[9px] text-ark-muted">{duration}</span>'
+            f'</div>'
+        )
+    calendar_html = (
+        '<div class="bg-ark-card border border-sky-500/20 rounded-2xl p-4 mt-4">'
+        '<div class="flex items-center gap-2 mb-3">'
+        '<svg class="w-4 h-4 text-sky-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>'
+        '<p class="text-[10px] font-black text-sky-400 tracking-[.15em]">TODAY\'S CALENDAR</p>'
+        '</div>'
+        '<div class="flex flex-col gap-2">' + "\n".join(rows) + '</div>'
+        '</div>'
+    )
+
 GH_PAT   = os.environ.get("GH_PAT", "")
 GH_REPO  = "Fredemantha0109/spring-ark-system"
 
@@ -863,6 +929,7 @@ html = (
     "        <div class=\"flex flex-col gap-2\">\n"
     + ai_section_inner
     + strategy_html
+    + calendar_html
     + system_trigger_html
     + priority_candidates_html +
     "\n        </div>\n"
