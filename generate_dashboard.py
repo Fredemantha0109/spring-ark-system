@@ -886,13 +886,7 @@ html = (
     "      </div>\n"
     f"      <p class=\"text-xs text-ark-muted\">{header_date}</p>\n"
     "    </div>\n"
-    "    <div class=\"flex items-center gap-2\">\n"
     + load_badge_html +
-    f"    <div class=\"inline-flex items-center gap-1.5 bg-{judge_color}-500/10 border border-{judge_color}-500/30 rounded-full px-3 py-1.5\">\n"
-    f"      <div class=\"w-1.5 h-1.5 rounded-full bg-{judge_color}-400 animate-pulse-slow\"></div>\n"
-    f"      <span class=\"text-[11px] font-bold text-{judge_color}-400 tracking-wider uppercase\">{judge_label}</span>\n"
-    "    </div>\n"
-    "    </div>\n"
     "  </header>\n"
 
     # Daily view wrapper
@@ -953,6 +947,7 @@ html = (
     "    </div>\n"
 
     "    <div class=\"flex flex-col gap-4\">\n"
+    + calendar_html +
     "      <div class=\"stripe bg-ark-card border border-violet-500/20 rounded-2xl p-4 glow-violet flex-1\">\n"
     "        <div class=\"flex items-center gap-2 mb-5\">\n"
     "          <div class=\"w-7 h-7 rounded-xl bg-violet-500/20 border border-violet-500/30 flex items-center justify-center\">\n"
@@ -972,7 +967,6 @@ html = (
     "        <div class=\"flex flex-col gap-2\">\n"
     + ai_section_inner
     + strategy_html
-    + calendar_html
     + system_trigger_html
     + priority_candidates_html +
     "\n        </div>\n"
