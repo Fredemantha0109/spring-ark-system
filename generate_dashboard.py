@@ -343,22 +343,24 @@ if ai_strategies:
 calendar_events = []
 if CALENDAR_DATABASE_ID:
     try:
+        # 今日の日付範囲（SGT）
+        today_start = today + "T00:00:00+08:00"
+        today_end   = today + "T23:59:59+08:00"
         cal_res = requests.post(
             f"https://api.notion.com/v1/databases/{CALENDAR_DATABASE_ID}/query",
             headers=HEADERS,
             json={
                 "filter": {
-                    "property": "\u65e5\u4ed8",
-                    "date": {"on_or_after": today, "on_or_before": today}
+                    "and": [
+                        {"property": "\u65e5\u4ed8", "date": {"on_or_after": today_start}},
+                        {"property": "\u65e5\u4ed8", "date": {"on_or_before": today_end}}
+                    ]
                 },
                 "sorts": [{"property": "\u65e5\u4ed8", "direction": "ascending"}]
             }
         )
         cal_data = cal_res.json()
-        print(f"[DEBUG] Calendar status: {cal_res.status_code}")
-        print(f"[DEBUG] Calendar results count: {len(cal_data.get('results', []))}")
-        if cal_data.get('results'):
-            print(f"[DEBUG] First result props: {list(cal_data['results'][0]['properties'].keys())}")
+        print(f"[DEBUG] Calendar status: {cal_res.status_code}, count: {len(cal_data.get('results', []))}")
         for page in cal_data.get("results", []):
             props = page["properties"]
             name = ""
