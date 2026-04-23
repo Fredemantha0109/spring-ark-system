@@ -414,6 +414,39 @@ if calendar_events:
 GH_PAT   = os.environ.get("GH_PAT", "")
 GH_REPO  = "Fredemantha0109/spring-ark-system"
 
+# ── 高負荷モード判定 ──────────────────────────────
+def calc_load_mode(events):
+    total_mins = 0
+    for ev in events:
+        if ev.get("end"):
+            try:
+                sh, sm = int(ev["start"][:2]), int(ev["start"][3:])
+                eh, em = int(ev["end"][:2]),   int(ev["end"][3:])
+                total_mins += (eh * 60 + em) - (sh * 60 + sm)
+            except:
+                pass
+    count = len(events)
+    if count >= 3 or total_mins >= 120:
+        return "\U0001f534 \u591a\u5fd9\u65e5", "red",   "\u7fd2\u6163\u306f\u6700\u5c0f\u9650\u3067"
+    elif count >= 1 or total_mins >= 60:
+        return "\U0001f7e1 \u901a\u5e38\u65e5", "amber", "\u3044\u3064\u3082\u901a\u308a\u3067"
+    else:
+        return "\U0001f7e2 \u4f59\u88d5\u65e5", "green", "\u7fd2\u6163\u3092\u7a4d\u307f\u4e0a\u3052\u308b\u30c1\u30e3\u30f3\u30b9"
+
+load_label, load_color, load_sub = calc_load_mode(calendar_events)
+load_color_map = {
+    "red":   ("text-red-400",   "bg-red-500/10 border-red-500/30"),
+    "amber": ("text-amber-300", "bg-amber-500/10 border-amber-500/30"),
+    "green": ("text-green-400", "bg-green-500/10 border-green-500/30"),
+}
+load_text_c, load_badge_cls = load_color_map[load_color]
+load_badge_html = (
+    f'<div class="inline-flex items-center gap-1.5 {load_badge_cls} rounded-full px-3 py-1.5 ml-2">'
+    f'<div class="w-1.5 h-1.5 rounded-full bg-{load_color}-400 animate-pulse-slow"></div>'
+    f'<span class="text-[11px] font-bold {load_text_c}">{load_label}</span>'
+    f'</div>'
+)
+
 system_trigger_html = ""
 if judge_label == "危険":
     system_trigger_html = (
@@ -853,9 +886,12 @@ html = (
     "      </div>\n"
     f"      <p class=\"text-xs text-ark-muted\">{header_date}</p>\n"
     "    </div>\n"
+    "    <div class=\"flex items-center gap-2\">\n"
+    + load_badge_html +
     f"    <div class=\"inline-flex items-center gap-1.5 bg-{judge_color}-500/10 border border-{judge_color}-500/30 rounded-full px-3 py-1.5\">\n"
     f"      <div class=\"w-1.5 h-1.5 rounded-full bg-{judge_color}-400 animate-pulse-slow\"></div>\n"
     f"      <span class=\"text-[11px] font-bold text-{judge_color}-400 tracking-wider uppercase\">{judge_label}</span>\n"
+    "    </div>\n"
     "    </div>\n"
     "  </header>\n"
 
