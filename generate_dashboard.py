@@ -287,8 +287,8 @@ def category_card(name, subtitle, icon_svg, color, score, plan_tasks, done_tasks
         '<div class="h-1.5 bg-ark-dim rounded-full overflow-hidden">'
         '<div class="h-full rounded-full bg-gradient-to-r ' + bar_grad + ' bar" style="width:' + str(score) + '%"></div>'
         '</div></div>'
-        rows
-        '</div>'
+        + rows
+        + '</div>'
     )
 
 # アイコンSVG
