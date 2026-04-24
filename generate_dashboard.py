@@ -505,7 +505,7 @@ def make_candidate_card(rank, task_name, category, reason, gh_pat, gh_repo):
         f'<p class="text-sm font-black text-white truncate">{task_name}</p>'
         f'<p class="text-[9px] text-ark-muted mt-0.5">{reason}</p>'
         f'</div>'
-        f'<button onclick="{fn}()" class="flex-shrink-0 bg-amber-500/15 hover:bg-amber-500/30 border border-amber-500/30 text-amber-300 text-[10px] font-black rounded-lg px-3 py-1.5 transition-all cursor-pointer">'
+        f'<button onclick="{fn}()" class="flex-shrink-0 bg-violet-500/15 hover:bg-violet-500/30 border border-violet-500/30 text-violet-300 text-[10px] font-black rounded-lg px-3 py-1.5 transition-all cursor-pointer">'
         f'\U0001f525 \u512a\u5148\u8a2d\u5b9a</button>'
         f'</div></div>'
         f'<script>'
@@ -538,7 +538,7 @@ if cards:
         '<div class="bg-ark-card border border-amber-500/20 rounded-2xl p-4 mt-4">'
         '<div class="flex items-center gap-2 mb-3">'
         '<svg class="w-4 h-4 text-amber-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>'
-        '<p class="text-[10px] font-black text-amber-400 tracking-[.15em]">PRIORITY CANDIDATES</p>'
+        '<p class="text-[10px] font-black text-violet-400 tracking-[.15em]">PRIORITY CANDIDATES</p>'
         '</div>'
         '<div class="flex flex-col gap-2">'
         + "\n".join(cards) +
