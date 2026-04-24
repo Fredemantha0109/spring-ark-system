@@ -236,28 +236,28 @@ if last_done:
 
 # ── タスク行HTML生成 ──────────────────────────────
 def task_rows_html(plan_tasks, done_tasks):
-    rows = []
+    items = []
     for task in plan_tasks:
         done = task in done_tasks
         if done:
             icon = (
-                '<div class="w-4 h-4 rounded-full flex-shrink-0 bg-green-500/20 border border-green-500/50'
+                '<div class="w-3.5 h-3.5 rounded-full flex-shrink-0 bg-green-500/20 border border-green-500/50'
                 ' flex items-center justify-center">'
-                '<svg class="w-2.5 h-2.5 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">'
+                '<svg class="w-2 h-2 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">'
                 '<polyline stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" points="20 6 9 17 4 12"/>'
                 '</svg></div>'
             )
         else:
-            icon = '<div class="w-4 h-4 rounded-full flex-shrink-0 border border-ark-border bg-ark-dim"></div>'
-        name_class = "text-white/55 line-through" if done else "text-white/80"
+            icon = '<div class="w-3.5 h-3.5 rounded-full flex-shrink-0 border border-ark-border bg-ark-dim"></div>'
+        name_class = "text-white/50 line-through" if done else "text-white/80"
         row_class  = "priority-row" if "🔥" in task else ""
-        rows.append(
-            '<div class="flex items-center gap-2 py-0.5 ' + row_class + '">'
+        items.append(
+            '<div class="flex items-center gap-1.5 py-0.5 ' + row_class + '">'
             + icon
-            + '<span class="text-sm flex-1 ' + name_class + '">' + task + '</span>'
+            + '<span class="text-xs flex-1 ' + name_class + '">' + task + '</span>'
             + '</div>'
         )
-    return "\n".join(rows)
+    return '<div class="grid grid-cols-2 gap-x-3">' + "\n".join(items) + '</div>'
 
 # ── カテゴリカードHTML ────────────────────────────
 def category_card(name, subtitle, icon_svg, color, score, plan_tasks, done_tasks):
@@ -287,7 +287,7 @@ def category_card(name, subtitle, icon_svg, color, score, plan_tasks, done_tasks
         '<div class="h-1.5 bg-ark-dim rounded-full overflow-hidden">'
         '<div class="h-full rounded-full bg-gradient-to-r ' + bar_grad + ' bar" style="width:' + str(score) + '%"></div>'
         '</div></div>'
-        '<div class="space-y-1.5">' + rows + '</div>'
+        rows
         '</div>'
     )
 
