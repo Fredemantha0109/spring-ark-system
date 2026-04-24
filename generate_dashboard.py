@@ -506,7 +506,7 @@ def make_candidate_card(rank, task_name, category, reason, gh_pat, gh_repo):
         f'<p class="text-[9px] text-ark-muted mt-0.5">{reason}</p>'
         f'</div>'
         f'<button onclick="{fn}()" class="flex-shrink-0 bg-violet-500/15 hover:bg-violet-500/30 border border-violet-500/30 text-violet-300 text-[10px] font-black rounded-lg px-3 py-1.5 transition-all cursor-pointer">'
-        f'\U0001f525 \u512a\u5148\u8a2d\u5b9a</button>'
+        f'\u26a1 \u512a\u5148\u8a2d\u5b9a</button>'
         f'</div></div>'
         f'<script>'
         f'async function {fn}(){{'
