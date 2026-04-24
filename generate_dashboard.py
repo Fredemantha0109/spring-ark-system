@@ -778,18 +778,19 @@ def weekly_task_card(name, subtitle, icon_svg, color, score, task_rows_list):
         "sky":   ("text-sky-400",   "bg-sky-500/10 border-sky-500/20",     "border-sky-500/20",   "from-sky-500 to-cyan-400"),
     }
     text_c, icon_wrap, card_border, bar_grad = color_map[color]
-    rows_html = ""
+    items_html = ""
     for task_name, cat_key in task_rows_list:
         cnt = task_done_count.get((task_name, cat_key), 0)
         if cnt == 0:
             continue
-        rows_html += (
-            f'<div class="flex items-center gap-2 py-0.5">'
-            f'<div class="w-4 h-4 rounded-full flex-shrink-0 bg-green-500/20 border border-green-500/50 flex items-center justify-center">'
-            f'<span class="text-[8px] font-black text-green-400">{cnt}</span></div>'
-            f'<span class="text-sm flex-1 text-white/80">{task_name}</span>'
+        items_html += (
+            f'<div class="flex items-center gap-1.5 py-0.5">'
+            f'<div class="w-3.5 h-3.5 rounded-full flex-shrink-0 bg-green-500/20 border border-green-500/50 flex items-center justify-center">'
+            f'<span class="text-[7px] font-black text-green-400">{cnt}</span></div>'
+            f'<span class="text-xs flex-1 text-white/80">{task_name}</span>'
             f'</div>'
         )
+    rows_html = '<div class="grid grid-cols-2 gap-x-3">' + items_html + '</div>'
     return (
         '<div class="ark-card bg-ark-card border ' + card_border + ' rounded-2xl p-4">'
         '<div class="flex items-start justify-between mb-3">'
@@ -806,8 +807,8 @@ def weekly_task_card(name, subtitle, icon_svg, color, score, task_rows_list):
         '<div class="mb-3"><div class="h-1.5 bg-ark-dim rounded-full overflow-hidden">'
         '<div class="h-full rounded-full bg-gradient-to-r ' + bar_grad + ' bar" style="width:' + str(score) + '%"></div>'
         '</div></div>'
-        '<div class="space-y-1.5">' + rows_html + '</div>'
-        '</div>'
+        + rows_html
+        + '</div>'
     )
 
 weekly_cards_html = (
