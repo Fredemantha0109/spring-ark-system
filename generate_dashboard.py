@@ -236,28 +236,30 @@ if last_done:
 
 # ── タスク行HTML生成 ──────────────────────────────
 def task_rows_html(plan_tasks, done_tasks):
+    if not plan_tasks:
+        return '<p class="text-xs italic py-1" style="color:rgba(74,90,114,0.7)">本日タスクなし</p>'
     items = []
     for task in plan_tasks:
         done = task in done_tasks
         if done:
             icon = (
-                '<div class="w-3.5 h-3.5 rounded-full flex-shrink-0 bg-green-500/20 border border-green-500/50'
+                '<div class="w-3.5 h-3.5 rounded-full flex-shrink-0 bg-green-500/25 border border-green-400/60'
                 ' flex items-center justify-center">'
                 '<svg class="w-2 h-2 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">'
-                '<polyline stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" points="20 6 9 17 4 12"/>'
+                '<polyline stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="20 6 9 17 4 12"/>'
                 '</svg></div>'
             )
         else:
-            icon = '<div class="w-3.5 h-3.5 rounded-full flex-shrink-0 border border-ark-border bg-ark-dim"></div>'
-        name_class = "text-white/50 line-through" if done else "text-white/80"
+            icon = '<div class="w-3.5 h-3.5 rounded-full flex-shrink-0 border border-white/15 bg-white/5"></div>'
+        name_class = "text-white/40 line-through" if done else "text-white/80"
         row_class  = "priority-row" if "🔥" in task else ""
         items.append(
-            '<div class="flex items-center gap-1.5 py-0.5 ' + row_class + '">'
+            '<div class="flex items-center gap-1.5 py-[3px] ' + row_class + '">'
             + icon
-            + '<span class="text-xs flex-1 ' + name_class + '">' + task + '</span>'
+            + '<span class="text-xs flex-1 leading-tight ' + name_class + '">' + task + '</span>'
             + '</div>'
         )
-    return '<div class="grid grid-cols-2 gap-x-3">' + "\n".join(items) + '</div>'
+    return '<div class="grid grid-cols-2 gap-x-3 gap-y-0.5">' + "\n".join(items) + '</div>'
 
 # ── カテゴリカードHTML ────────────────────────────
 def category_card(name, subtitle, icon_svg, color, score, plan_tasks, done_tasks):
@@ -784,13 +786,16 @@ def weekly_task_card(name, subtitle, icon_svg, color, score, task_rows_list):
         if cnt == 0:
             continue
         items_html += (
-            f'<div class="flex items-center gap-1.5 py-0.5">'
-            f'<div class="w-3.5 h-3.5 rounded-full flex-shrink-0 bg-green-500/20 border border-green-500/50 flex items-center justify-center">'
+            f'<div class="flex items-center gap-1.5 py-[3px]">'
+            f'<div class="w-3.5 h-3.5 rounded-full flex-shrink-0 bg-green-500/25 border border-green-400/60 flex items-center justify-center">'
             f'<span class="text-[7px] font-black text-green-400">{cnt}</span></div>'
-            f'<span class="text-xs flex-1 text-white/80">{task_name}</span>'
+            f'<span class="text-xs flex-1 leading-tight text-white/80">{task_name}</span>'
             f'</div>'
         )
-    rows_html = '<div class="grid grid-cols-2 gap-x-3">' + items_html + '</div>'
+    if not items_html:
+        rows_html = '<p class="text-xs italic py-1" style="color:rgba(74,90,114,0.7)">今週の実績なし</p>'
+    else:
+        rows_html = '<div class="grid grid-cols-2 gap-x-3 gap-y-0.5">' + items_html + '</div>'
     return (
         '<div class="ark-card bg-ark-card border ' + card_border + ' rounded-2xl p-4">'
         '<div class="flex items-start justify-between mb-3">'
@@ -802,7 +807,7 @@ def weekly_task_card(name, subtitle, icon_svg, color, score, task_rows_list):
         '<p class="text-xs font-black ' + text_c + ' tracking-[.15em]">' + name + '</p>'
         '<p class="text-xs text-ark-muted">' + subtitle + '</p>'
         '</div></div>'
-        '<p class="text-2xl font-black ' + text_c + '">' + str(score) + '<span class="text-sm text-ark-muted font-normal">/100点</span></p>'
+        '<p class="text-xl font-black ' + text_c + '">' + str(score) + '<span class="text-sm text-ark-muted font-normal">/100点</span></p>'
         '</div>'
         '<div class="mb-3"><div class="h-1.5 bg-ark-dim rounded-full overflow-hidden">'
         '<div class="h-full rounded-full bg-gradient-to-r ' + bar_grad + ' bar" style="width:' + str(score) + '%"></div>'
