@@ -254,7 +254,7 @@ def task_rows_html(plan_tasks, done_tasks):
         rows.append(
             '<div class="flex items-center gap-2 py-0.5 ' + row_class + '">'
             + icon
-            + '<span class="text-xs flex-1 ' + name_class + '">' + task + '</span>'
+            + '<span class="text-sm flex-1 ' + name_class + '">' + task + '</span>'
             + '</div>'
         )
     return "\n".join(rows)
@@ -277,8 +277,8 @@ def category_card(name, subtitle, icon_svg, color, score, plan_tasks, done_tasks
         '<span class="' + text_c + '">' + icon_svg + '</span>'
         '</div>'
         '<div>'
-        '<p class="text-[10px] font-black ' + text_c + ' tracking-[.15em]">' + name + '</p>'
-        '<p class="text-[9px] text-ark-muted">' + subtitle + '</p>'
+        '<p class="text-xs font-black ' + text_c + ' tracking-[.15em]">' + name + '</p>'
+        '<p class="text-xs text-ark-muted">' + subtitle + '</p>'
         '</div></div>'
         '<p class="text-xl font-black ' + text_c + '">' + str(score)
         + '<span class="text-sm text-ark-muted font-normal">/100点</span></p>'
@@ -556,9 +556,9 @@ cond_text_c = {"好調": "text-green-400", "普通": "text-amber-400", "不調":
 sleep_c = "text-amber-300" if isinstance(sleep, float) and sleep < 7 else "text-white"
 
 # インジケータードット設定
-good_dot_size     = "w-6 h-6" if judge_label == "\u826f\u597d"   else "w-4 h-4"
-caution_dot_size  = "w-6 h-6" if judge_label == "\u8981\u6ce8\u610f" else "w-4 h-4"
-alert_dot_size    = "w-6 h-6" if judge_label == "\u5371\u967a"   else "w-4 h-4"
+good_dot_size     = "w-8 h-8" if judge_label == "\u826f\u597d"   else "w-5 h-5"
+caution_dot_size  = "w-8 h-8" if judge_label == "\u8981\u6ce8\u610f" else "w-5 h-5"
+alert_dot_size    = "w-8 h-8" if judge_label == "\u5371\u967a"   else "w-5 h-5"
 good_dot_style    = "bg-green-400 shadow-[0_0_14px_rgba(34,197,94,.75)]"    if judge_label == "\u826f\u597d"   else "bg-green-500/15 border border-green-500/20"
 caution_dot_style = "bg-amber-400 shadow-[0_0_14px_rgba(251,191,36,.75)]"   if judge_label == "\u8981\u6ce8\u610f" else "bg-amber-500/15 border border-amber-500/20"
 alert_dot_style   = "bg-red-400 shadow-[0_0_14px_rgba(239,68,68,.75)]"      if judge_label == "\u5371\u967a"   else "bg-red-500/15 border border-red-500/20"
@@ -798,10 +798,10 @@ def weekly_task_card(name, subtitle, icon_svg, color, score, task_rows_list):
         '<span class="' + text_c + '">' + icon_svg + '</span>'
         '</div>'
         '<div>'
-        '<p class="text-[10px] font-black ' + text_c + ' tracking-[.15em]">' + name + '</p>'
-        '<p class="text-[9px] text-ark-muted">' + subtitle + '</p>'
+        '<p class="text-xs font-black ' + text_c + ' tracking-[.15em]">' + name + '</p>'
+        '<p class="text-xs text-ark-muted">' + subtitle + '</p>'
         '</div></div>'
-        '<p class="text-xl font-black ' + text_c + '">' + str(score) + '<span class="text-sm text-ark-muted font-normal">/100点</span></p>'
+        '<p class="text-2xl font-black ' + text_c + '">' + str(score) + '<span class="text-sm text-ark-muted font-normal">/100点</span></p>'
         '</div>'
         '<div class="mb-3"><div class="h-1.5 bg-ark-dim rounded-full overflow-hidden">'
         '<div class="h-full rounded-full bg-gradient-to-r ' + bar_grad + ' bar" style="width:' + str(score) + '%"></div>'
@@ -914,26 +914,26 @@ html = (
     "          </div>\n"
     "          <div class=\"w-px h-12 bg-ark-border\"></div>\n"
     "          <div>\n"
-    f"            <p class=\"text-2xl font-black {judge_text_c} leading-none mb-1\">{judge_label}</p>\n"
+    f"            <p class=\"text-4xl font-black {judge_text_c} leading-none mb-1\">{judge_label}</p>\n"
 
     "          </div>\n"
     "        </div>\n"
     "        <div class=\"flex gap-3 sm:ml-auto\">\n"
     "          <div class=\"bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]\">\n"
-    "            <p class=\"text-[9px] text-ark-muted mb-1\">体重</p>\n"
-    f"            <p class=\"text-base font-black text-white\">{weight}<span class=\"text-[9px] font-normal text-ark-muted\">kg</span></p>\n"
+    "            <p class=\"text-xs text-ark-muted mb-1\">体重</p>\n"
+    f"            <p class=\"text-xl font-black text-white\">{weight}<span class=\"text-xs font-normal text-ark-muted\">kg</span></p>\n"
     "          </div>\n"
     "          <div class=\"bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]\">\n"
-    "            <p class=\"text-[9px] text-ark-muted mb-1\">睡眠</p>\n"
-    f"            <p class=\"text-base font-black {sleep_c}\">{sleep}<span class=\"text-[9px] font-normal\">h</span></p>\n"
+    "            <p class=\"text-xs text-ark-muted mb-1\">睡眠</p>\n"
+    f"            <p class=\"text-xl font-black {sleep_c}\">{sleep}<span class=\"text-xs font-normal\">h</span></p>\n"
     "          </div>\n"
     "          <div class=\"bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]\">\n"
-    "            <p class=\"text-[9px] text-ark-muted mb-1\">体調</p>\n"
-    f"            <p class=\"text-base font-black {cond_text_c}\">{condition}</p>\n"
+    "            <p class=\"text-xs text-ark-muted mb-1\">体調</p>\n"
+    f"            <p class=\"text-xl font-black {cond_text_c}\">{condition}</p>\n"
     "          </div>\n"
     "          <div class=\"bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]\">\n"
-    "            <p class=\"text-[9px] text-ark-muted mb-1\">総合</p>\n"
-    f"            <p class=\"text-base font-black {judge_text_c}\">{score_total}<span class=\"text-[9px] font-normal text-ark-muted\">点</span></p>\n"
+    "            <p class=\"text-xs text-ark-muted mb-1\">総合</p>\n"
+    f"            <p class=\"text-xl font-black {judge_text_c}\">{score_total}<span class=\"text-xs font-normal text-ark-muted\">点</span></p>\n"
     "          </div>\n"
     "        </div>\n"
     "      </div>\n"
