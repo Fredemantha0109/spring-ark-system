@@ -594,10 +594,14 @@ q_day   = (target_date - q_start).days + 1
 header_date = f"{yesterday}\u00a0\u00b7\u00a0Week\u00a0{week_num}\u00a0\u00b7\u00a0Q{quarter}-Day\u00a0{q_day}"
 
 
-# ── Weekly集計（過去7日）────────────────────────
+# ── Weekly集計（先週月〜日）────────────────────────
+_today = datetime.now(sgt)
+_last_monday = _today - timedelta(days=_today.weekday() + 7)
+_last_sunday  = _last_monday + timedelta(days=6)
+w_period = f"{_last_monday.strftime('%m/%d')}（月）〜{_last_sunday.strftime('%m/%d')}（日）"
 weekly_pages = []
-for i in range(1, 8):
-    d = (datetime.now(sgt) - timedelta(days=i)).strftime("%Y-%m-%d")
+for i in range(7):
+    d = (_last_monday + timedelta(days=i)).strftime("%Y-%m-%d")
     _, p = fetch_page(d)
     if p:
         weekly_pages.append((d, p))
@@ -667,13 +671,18 @@ for cat_key in ["W", "C", "Ca", "I"]:
     rows = [(t, c) for (t, c), cnt in sorted(task_done_count.items(), key=lambda x: -x[1]) if c == cat_key]
     weekly_task_rows[cat_key] = rows
 
-# ── Monthly集計（過去30日）────────────────────────
+# ── Monthly集計（先月1日〜末日）────────────────────────
+_first_this_month = _today.replace(day=1)
+_last_month_end   = _first_this_month - timedelta(days=1)
+_last_month_start = _last_month_end.replace(day=1)
+m_period = _last_month_start.strftime("%Y年%-m月")
 monthly_pages = []
-for i in range(1, 31):
-    d = (datetime.now(sgt) - timedelta(days=i)).strftime("%Y-%m-%d")
-    _, p = fetch_page(d)
+_d = _last_month_start
+while _d <= _last_month_end:
+    _, p = fetch_page(_d.strftime("%Y-%m-%d"))
     if p:
-        monthly_pages.append((d, p))
+        monthly_pages.append((_d.strftime("%Y-%m-%d"), p))
+    _d += timedelta(days=1)
 
 def m_avg(key):
     vals = []
@@ -1140,7 +1149,7 @@ html = (
 
     # Weekly view
     + '<div id="weekly-view" style="display:none" class="flex flex-col gap-5">'
-    + f'<section><span class="text-[10px] font-bold text-ark-muted tracking-[.2em] uppercase block mb-2">Weekly Condition</span>'
+    + f'<section><div class="flex items-baseline gap-3 mb-2"><span class="text-[10px] font-bold text-ark-muted tracking-[.2em] uppercase">Weekly Condition</span><span class="text-[10px] text-ark-muted">{w_period}</span></div>'
     + f'<div class="bg-ark-card border ' + w_judge_border + ' rounded-2xl p-5 glow-amber"><div class="flex flex-col sm:flex-row sm:items-center gap-5">'
     + '<div class="flex items-center gap-4">'
     + '<div class="flex items-end gap-2.5">'
@@ -1164,7 +1173,7 @@ html = (
 
     # Monthly view
     + '<div id="monthly-view" style="display:none" class="flex flex-col gap-5">'
-    + f'<section><span class="text-[10px] font-bold text-ark-muted tracking-[.2em] uppercase block mb-2">Monthly Condition</span>'
+    + f'<section><div class="flex items-baseline gap-3 mb-2"><span class="text-[10px] font-bold text-ark-muted tracking-[.2em] uppercase">Monthly Condition</span><span class="text-[10px] text-ark-muted">{m_period}</span></div>'
     + f'<div class="bg-ark-card border ' + m_judge_border + ' rounded-2xl p-5 glow-amber"><div class="flex flex-col sm:flex-row sm:items-center gap-5">'
     + '<div class="flex items-center gap-4">'
     + '<div class="flex items-end gap-2.5">'
