@@ -33,11 +33,27 @@ def get_today_str():
     return datetime.now(ZoneInfo("Asia/Singapore")).strftime("%Y-%m-%d")
 
 def fetch_today_page(today):
-    url = f"https://api.notion.com/v1/databases/{DATABASE_ID}/query"
-    resp = requests.post(url, headers=HEADERS, json={"filter": {"property": "Date", "title": {"equals": today}}, "page_size": 1}, timeout=10)
+    resp = requests.post(
+        f"https://api.notion.com/v1/databases/{DATABASE_ID}/query",
+        headers=HEADERS,
+        json={"filter": {"property": "Date", "title": {"equals": today}}, "page_size": 1},
+        timeout=10
+    )
     resp.raise_for_status()
     results = resp.json().get("results", [])
     return results[0] if results else None
+
+def fetch_select_options(plan_prop):
+    """Notionデータベースから指定プロパティのselect選択肢一覧を取得"""
+    resp = requests.get(
+        f"https://api.notion.com/v1/databases/{DATABASE_ID}",
+        headers=HEADERS,
+        timeout=10
+    )
+    resp.raise_for_status()
+    props = resp.json().get("properties", {})
+    options = props.get(plan_prop, {}).get("multi_select", {}).get("options", [])
+    return [o["name"] for o in options]
 
 def get_multiselect_names(page, prop_name):
     return [item["name"] for item in page.get("properties", {}).get(prop_name, {}).get("multi_select", [])]
@@ -46,7 +62,12 @@ def save_plan_and_actuals(page_id, plans, actuals):
     properties = {}
     for prop, names in {**plans, **actuals}.items():
         properties[prop] = {"multi_select": [{"name": n} for n in names]}
-    resp = requests.patch(f"https://api.notion.com/v1/pages/{page_id}", headers=HEADERS, json={"properties": properties}, timeout=10)
+    resp = requests.patch(
+        f"https://api.notion.com/v1/pages/{page_id}",
+        headers=HEADERS,
+        json={"properties": properties},
+        timeout=10
+    )
     resp.raise_for_status()
 
 def main():
@@ -74,6 +95,8 @@ def main():
         for cat in CATEGORIES:
             st.session_state[f"tasks_{cat['key']}"]   = get_multiselect_names(page, cat["plan_prop"])
             st.session_state[f"actuals_{cat['key']}"] = set(get_multiselect_names(page, cat["actual_prop"]))
+            # Notionから選択肢を取得
+            st.session_state[f"options_{cat['key']}"] = fetch_select_options(cat["plan_prop"])
 
     st.markdown("**今日のタスク**")
     st.markdown("")
@@ -81,6 +104,10 @@ def main():
     for cat in CATEGORIES:
         tasks   = st.session_state[f"tasks_{cat['key']}"]
         actuals = st.session_state[f"actuals_{cat['key']}"]
+        options = st.session_state[f"options_{cat['key']}"]
+
+        # 追加済みタスクを除いた選択肢
+        available = [o for o in options if o not in tasks]
 
         st.markdown(f'<div class="category-label">{cat["label"]}</div>', unsafe_allow_html=True)
 
@@ -99,23 +126,29 @@ def main():
                     actuals.discard(task)
                     st.rerun()
 
-        # タスク追加
-        col_inp, col_add = st.columns([5, 1])
-        with col_inp:
-            new_task = st.text_input("追加", key=f"input_{cat['key']}", label_visibility="collapsed", placeholder=f"{cat['label']}のタスクを追加…")
-        with col_add:
-            if st.button("＋", key=f"add_{cat['key']}"):
-                if new_task.strip() and new_task.strip() not in tasks:
-                    tasks.append(new_task.strip())
-                    st.rerun()
+        # タスク追加（Notionの選択肢からドロップダウン）
+        if available:
+            col_sel, col_add = st.columns([5, 1])
+            with col_sel:
+                selected = st.selectbox(
+                    "追加",
+                    options=["-- タスクを選択 --"] + available,
+                    key=f"sel_{cat['key']}",
+                    label_visibility="collapsed"
+                )
+            with col_add:
+                if st.button("＋", key=f"add_{cat['key']}"):
+                    if selected != "-- タスクを選択 --":
+                        tasks.append(selected)
+                        st.rerun()
 
         st.markdown("---")
 
     if st.button("SAVE　→　実績を記録"):
         with st.spinner("保存中…"):
             try:
-                plans   = {cat["plan_prop"]:   st.session_state[f"tasks_{cat['key']}"] for cat in CATEGORIES}
-                actuals = {cat["actual_prop"]:  list(st.session_state[f"actuals_{cat['key']}"]) for cat in CATEGORIES}
+                plans   = {cat["plan_prop"]:  st.session_state[f"tasks_{cat['key']}"] for cat in CATEGORIES}
+                actuals = {cat["actual_prop"]: list(st.session_state[f"actuals_{cat['key']}"]) for cat in CATEGORIES}
                 save_plan_and_actuals(page_id, plans, actuals)
             except requests.RequestException as e:
                 st.error(f"保存に失敗しました: {e}")
