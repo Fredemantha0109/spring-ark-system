@@ -1042,7 +1042,7 @@ html = (
     "    <div>\n"
     "      <div class=\"flex items-baseline gap-2.5 mb-1\">\n"
     "        <h1 class=\"text-2xl font-black tracking-tight\">SPRING ARK</h1>\n"
-    "<div class=\"inline-flex bg-ark-dim rounded-full p-0.5 gap-0.5\"><button id=\"tab-daily\" onclick=\"switchTab(\'daily\')\" class=\"tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border\">Daily</button><button id=\"tab-weekly\" onclick=\"switchTab(\'weekly\')\" class=\"tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted\">Weekly</button></div>\n"
+    "<div class=\"inline-flex bg-ark-dim rounded-full p-0.5 gap-0.5\"><button id=\"tab-daily\" onclick=\"switchTab(\'daily\')\" class=\"tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border\">Daily</button><button id=\"tab-weekly\" onclick=\"switchTab(\'weekly\')\" class=\"tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted\">Weekly</button><button id=\"tab-monthly\" onclick=\"switchTab(\'monthly\')\" class=\"tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted\">Monthly</button></div>\n"
     "      </div>\n"
     f"      <p class=\"text-xs text-ark-muted\">{header_date}</p>\n"
     "    </div>\n"
