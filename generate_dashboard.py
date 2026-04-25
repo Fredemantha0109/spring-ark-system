@@ -436,6 +436,64 @@ def calc_load_mode(events):
         return "\U0001f7e2 \u4f59\u88d5\u65e5", "green", "\u7fd2\u6163\u3092\u7a4d\u307f\u4e0a\u3052\u308b\u30c1\u30e3\u30f3\u30b9"
 
 load_label, load_color, load_sub = calc_load_mode(calendar_events)
+
+def fetch_load_for_date(date_str):
+    """指定日のカレンダー予定を取得してload判定を返す"""
+    if not CALENDAR_DATABASE_ID:
+        return "通常日"
+    try:
+        day_start = date_str + "T00:00:00+08:00"
+        day_end   = date_str + "T23:59:59+08:00"
+        res = requests.post(
+            f"https://api.notion.com/v1/databases/{CALENDAR_DATABASE_ID}/query",
+            headers=HEADERS,
+            json={"filter": {"and": [
+                {"property": "日付", "date": {"on_or_after": day_start}},
+                {"property": "日付", "date": {"on_or_before": day_end}}
+            ]}},
+            timeout=10
+        )
+        evs = []
+        for page in res.json().get("results", []):
+            props = page["properties"]
+            date_prop = props.get("日付", {}).get("date", {}) or {}
+            start = date_prop.get("start", "")
+            end   = date_prop.get("end", "")
+            if "T" in start:
+                evs.append({"start": start[11:16], "end": end[11:16] if end and "T" in end else ""})
+        label, _, _ = calc_load_mode(evs)
+        return label
+    except:
+        return "通常日"
+
+def majority_load(date_list, suffix):
+    """日付リストのload判定多数決でバッジHTMLを返す"""
+    counts = {}
+    for d in date_list:
+        lbl = fetch_load_for_date(d)
+        # 絵文字+テキスト例: "🟡 通常日" → "通常"部分だけ取得
+        key = lbl.split(" ")[-1].replace("日", "")
+        counts[key] = counts.get(key, 0) + 1
+    if not counts:
+        top_key = "通常"
+    else:
+        top_key = sorted(counts.items(), key=lambda x: -x[1])[0][0]
+    # 色マップ
+    color_map = {"多忙": ("red", "🔴"), "通常": ("amber", "🟡"), "余裕": ("green", "🟢")}
+    color, emoji = color_map.get(top_key, ("amber", "🟡"))
+    badge_color_map = {
+        "red":   ("text-red-400",   "bg-red-500/10 border-red-500/30"),
+        "amber": ("text-amber-300", "bg-amber-500/10 border-amber-500/30"),
+        "green": ("text-green-400", "bg-green-500/10 border-green-500/30"),
+    }
+    tc, bc = badge_color_map[color]
+    label = f"{emoji} {top_key}{suffix}"
+    return (
+        f'<div class="inline-flex items-center gap-1.5 {bc} rounded-full px-3 py-1.5 ml-2">'
+        f'<div class="w-1.5 h-1.5 rounded-full bg-{color}-400 animate-pulse-slow"></div>'
+        f'<span class="text-[11px] font-bold {tc}">{label}</span>'
+        f'</div>'
+    )
 load_color_map = {
     "red":   ("text-red-400",   "bg-red-500/10 border-red-500/30"),
     "amber": ("text-amber-300", "bg-amber-500/10 border-amber-500/30"),
@@ -743,6 +801,10 @@ m_judge_colors = {
     "red":   ("text-red-400",   "border-red-500/25"),
 }
 m_judge_text_c, m_judge_border = m_judge_colors[m_judge_color]
+
+# Weekly/Monthly バッジHTML（カレンダー多数決）
+w_badge_html = majority_load([d for d, _ in weekly_pages], "週")
+m_badge_html = majority_load([d for d, _ in monthly_pages], "月")
 
 # Monthly AIコメント生成
 def generate_monthly_comment(m_score_w, m_score_c, m_score_ca, m_score_i, m_score_total,
@@ -1149,6 +1211,9 @@ html = (
 
     # Weekly view
     + '<div id="weekly-view" style="display:none" class="flex flex-col gap-5">'
+    + '<div class="flex justify-end mb-[-12px]">'
+    + w_badge_html
+    + '</div>'
     + f'<section><div class="flex items-baseline gap-3 mb-2"><span class="text-[10px] font-bold text-ark-muted tracking-[.2em] uppercase">Weekly Condition</span><span class="text-[10px] text-ark-muted">{w_period}</span></div>'
     + f'<div class="bg-ark-card border ' + w_judge_border + ' rounded-2xl p-5 glow-amber"><div class="flex flex-col sm:flex-row sm:items-center gap-5">'
     + '<div class="flex items-center gap-4">'
@@ -1173,6 +1238,9 @@ html = (
 
     # Monthly view
     + '<div id="monthly-view" style="display:none" class="flex flex-col gap-5">'
+    + '<div class="flex justify-end mb-[-12px]">'
+    + m_badge_html
+    + '</div>'
     + f'<section><div class="flex items-baseline gap-3 mb-2"><span class="text-[10px] font-bold text-ark-muted tracking-[.2em] uppercase">Monthly Condition</span><span class="text-[10px] text-ark-muted">{m_period}</span></div>'
     + f'<div class="bg-ark-card border ' + m_judge_border + ' rounded-2xl p-5 glow-amber"><div class="flex flex-col sm:flex-row sm:items-center gap-5">'
     + '<div class="flex items-center gap-4">'
