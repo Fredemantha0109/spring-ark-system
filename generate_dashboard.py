@@ -813,14 +813,6 @@ if monthly_summaries or monthly_analysis:
 else:
     monthly_comment_html = '<p class="text-xs text-ark-muted text-center py-4">月次分析データがありません</p>'
 
-# Monthlyカテゴリカード（週次回数 → 月次回数で流用）
-monthly_cards_html = (
-    weekly_task_card("WELLNESS",      "運動・食事・精神",  ICON_W,  "green", m_score_w,  monthly_task_rows["W"],  ) +
-    weekly_task_card("COMMUNICATION", "英語学習・実践",    ICON_C,  "amber", m_score_c,  monthly_task_rows["C"],  ) +
-    weekly_task_card("CAREER",        "AI・ビジネス・CPA", ICON_CA, "rose",  m_score_ca, monthly_task_rows["Ca"], ) +
-    weekly_task_card("INPUT",         "読書・NewsPicks",   ICON_I,  "sky",   m_score_i,  monthly_task_rows["I"],  )
-)
-
 # Weekly判定
 if w_score_total >= 80:
     w_judge_label, w_judge_color = "\U0001f3fb\u7d76\u597d\u8abf", "green"
@@ -975,6 +967,14 @@ weekly_cards_html = (
     weekly_task_card("COMMUNICATION", "英語学習・実践",        ICON_C,  "amber", w_score_c,  weekly_task_rows["C"],  ) +
     weekly_task_card("CAREER",        "AI・ビジネス・CPA",         ICON_CA, "rose",  w_score_ca, weekly_task_rows["Ca"], ) +
     weekly_task_card("INPUT",         "読書・NewsPicks",                        ICON_I,  "sky",   w_score_i,  weekly_task_rows["I"],  )
+)
+
+# Monthlyカテゴリカード
+monthly_cards_html = (
+    weekly_task_card("WELLNESS",      "運動・食事・精神",  ICON_W,  "green", m_score_w,  monthly_task_rows["W"],  ) +
+    weekly_task_card("COMMUNICATION", "英語学習・実践",    ICON_C,  "amber", m_score_c,  monthly_task_rows["C"],  ) +
+    weekly_task_card("CAREER",        "AI・ビジネス・CPA", ICON_CA, "rose",  m_score_ca, monthly_task_rows["Ca"], ) +
+    weekly_task_card("INPUT",         "読書・NewsPicks",   ICON_I,  "sky",   m_score_i,  monthly_task_rows["I"],  )
 )
 
 cards_html = (
