@@ -1117,8 +1117,10 @@ html = (
     "      </div>\n"
     f"      <p class=\"text-xs text-ark-muted\">{header_date}</p>\n"
     "    </div>\n"
-    + load_badge_html +
-    "  </header>\n"
+    + '<div id="badge-daily">' + load_badge_html + '</div>'
+    + '<div id="badge-weekly" style="display:none">' + w_badge_html + '</div>'
+    + '<div id="badge-monthly" style="display:none">' + m_badge_html + '</div>'
+    + "  </header>\n"
 
     # Daily view wrapper
     '<div id="daily-view">'
@@ -1211,9 +1213,7 @@ html = (
 
     # Weekly view
     + '<div id="weekly-view" style="display:none" class="flex flex-col gap-5">'
-    + '<div class="flex justify-end mb-[-12px]">'
-    + w_badge_html
-    + '</div>'
+
     + f'<section><div class="flex items-baseline gap-3 mb-2"><span class="text-[10px] font-bold text-ark-muted tracking-[.2em] uppercase">Weekly Condition</span><span class="text-[10px] text-ark-muted">{w_period}</span></div>'
     + f'<div class="bg-ark-card border ' + w_judge_border + ' rounded-2xl p-5 glow-amber"><div class="flex flex-col sm:flex-row sm:items-center gap-5">'
     + '<div class="flex items-center gap-4">'
@@ -1238,9 +1238,7 @@ html = (
 
     # Monthly view
     + '<div id="monthly-view" style="display:none" class="flex flex-col gap-5">'
-    + '<div class="flex justify-end mb-[-12px]">'
-    + m_badge_html
-    + '</div>'
+
     + f'<section><div class="flex items-baseline gap-3 mb-2"><span class="text-[10px] font-bold text-ark-muted tracking-[.2em] uppercase">Monthly Condition</span><span class="text-[10px] text-ark-muted">{m_period}</span></div>'
     + f'<div class="bg-ark-card border ' + m_judge_border + ' rounded-2xl p-5 glow-amber"><div class="flex flex-col sm:flex-row sm:items-center gap-5">'
     + '<div class="flex items-center gap-4">'
@@ -1264,7 +1262,7 @@ html = (
     + '</div></div></div>'
 
     # タブJS
-    + '<script>var ON="tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border";var OFF="tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted";function switchTab(t){document.getElementById("daily-view").style.display=t==="daily"?"":"none";document.getElementById("weekly-view").style.display=t==="weekly"?"":"none";document.getElementById("monthly-view").style.display=t==="monthly"?"":"none";document.getElementById("tab-daily").className=t==="daily"?ON:OFF;document.getElementById("tab-weekly").className=t==="weekly"?ON:OFF;document.getElementById("tab-monthly").className=t==="monthly"?ON:OFF;}</script>'
+    + '<script>var ON="tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border";var OFF="tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted";function switchTab(t){document.getElementById("daily-view").style.display=t==="daily"?"":"none";document.getElementById("weekly-view").style.display=t==="weekly"?"":"none";document.getElementById("monthly-view").style.display=t==="monthly"?"":"none";document.getElementById("badge-daily").style.display=t==="daily"?"":"none";document.getElementById("badge-weekly").style.display=t==="weekly"?"":"none";document.getElementById("badge-monthly").style.display=t==="monthly"?"":"none";document.getElementById("tab-daily").className=t==="daily"?ON:OFF;document.getElementById("tab-weekly").className=t==="weekly"?ON:OFF;document.getElementById("tab-monthly").className=t==="monthly"?ON:OFF;}</script>'
 
     "\n  <footer class=\"flex items-center justify-between pt-1 pb-3\">\n"
     "    <p class=\"text-[9px] text-ark-muted\">SPRING ARK &copy; 2026</p>\n"
