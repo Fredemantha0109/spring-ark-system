@@ -55,6 +55,15 @@ def fetch_select_options(plan_prop):
     options = props.get(plan_prop, {}).get("multi_select", {}).get("options", [])
     return [o["name"] for o in options]
 
+def get_base_name(name):
+    """🔥を除いたベース名を返す"""
+    return name.lstrip("🔥").strip()
+
+def filter_available(options, tasks):
+    """追加済みタスクと、その🔥ペアを除外した選択肢を返す"""
+    added_bases = {get_base_name(t) for t in tasks}
+    return [o for o in options if get_base_name(o) not in added_bases]
+
 def get_multiselect_names(page, prop_name):
     return [item["name"] for item in page.get("properties", {}).get(prop_name, {}).get("multi_select", [])]
 
@@ -106,8 +115,8 @@ def main():
         actuals = st.session_state[f"actuals_{cat['key']}"]
         options = st.session_state[f"options_{cat['key']}"]
 
-        # 追加済みタスクを除いた選択肢
-        available = [o for o in options if o not in tasks]
+        # 追加済みタスクと🔥ペアを除いた選択肢
+        available = filter_available(options, tasks)
 
         st.markdown(f'<div class="category-label">{cat["label"]}</div>', unsafe_allow_html=True)
 
@@ -126,9 +135,9 @@ def main():
                     actuals.discard(task)
                     st.rerun()
 
-        # タスク追加（Notionの選択肢からドロップダウン）
+        # タスク追加（Notionの選択肢からドロップダウン、なければテキスト入力）
+        col_sel, col_add = st.columns([5, 1])
         if available:
-            col_sel, col_add = st.columns([5, 1])
             with col_sel:
                 selected = st.selectbox(
                     "追加",
@@ -140,6 +149,14 @@ def main():
                 if st.button("＋", key=f"add_{cat['key']}"):
                     if selected != "-- タスクを選択 --":
                         tasks.append(selected)
+                        st.rerun()
+        else:
+            with col_sel:
+                new_task = st.text_input("追加", key=f"input_{cat['key']}", label_visibility="collapsed", placeholder=f"{cat['label']}のタスクを追加…")
+            with col_add:
+                if st.button("＋", key=f"add_{cat['key']}"):
+                    if new_task.strip() and new_task.strip() not in tasks:
+                        tasks.append(new_task.strip())
                         st.rerun()
 
         st.markdown("---")
