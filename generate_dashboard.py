@@ -76,6 +76,66 @@ import json as _json
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 
+# ── JSON出力バリデーション（コードでブレをなくす）────────────
+def validate_strategy(item):
+    """作戦1件をバリデーション・補完して返す"""
+    if not isinstance(item, dict):
+        return {"title": "今日も着実に前進", "detail": "基本タスクを1つずつ丁寧に実施する"}
+    title  = str(item.get("title", "")).strip()
+    detail = str(item.get("detail", "")).strip()
+    # 必須フィールドが空なら補完
+    if not title:
+        title = "今日も着実に前進"
+    if not detail:
+        detail = "基本タスクを1つずつ丁寧に実施する"
+    # 文字数上限（超過はトリミング）
+    if len(title) > 20:
+        title = title[:20]
+    if len(detail) > 50:
+        detail = detail[:50]
+    return {"title": title, "detail": detail}
+
+def validate_strategies(raw):
+    """作戦リストをバリデーション・補完して3件保証で返す"""
+    if not isinstance(raw, list):
+        raw = []
+    validated = [validate_strategy(item) for item in raw[:3]]
+    # 3件未満なら補完
+    defaults = [
+        {"title": "基本タスクを実施", "detail": "今日の予定タスクを1つずつ確実にこなす"},
+        {"title": "コンディション維持", "detail": "睡眠・食事・運動のバランスを意識する"},
+        {"title": "振り返りを記録", "detail": "夜に今日の実績をNotionに記録する"},
+    ]
+    while len(validated) < 3:
+        validated.append(defaults[len(validated)])
+    return validated
+
+def validate_weekly_monthly(parsed):
+    """Weekly/Monthly分析レポートをバリデーション・補完して返す"""
+    if not isinstance(parsed, dict):
+        parsed = {}
+    # summariesのバリデーション
+    summaries = parsed.get("summaries", [])
+    if not isinstance(summaries, list):
+        summaries = []
+    validated_summaries = []
+    for s in summaries[:3]:
+        if not isinstance(s, dict):
+            continue
+        t = str(s.get("title", "")).strip()[:20] or "分析中"
+        d = str(s.get("detail", "")).strip()[:50] or "データを確認中です"
+        validated_summaries.append({"title": t, "detail": d})
+    # 3件未満なら補完
+    while len(validated_summaries) < 3:
+        validated_summaries.append({"title": "データ収集中", "detail": "記録が蓄積されると詳細な分析が表示されます"})
+    # analysisのバリデーション
+    analysis = str(parsed.get("analysis", "")).strip()
+    if not analysis:
+        analysis = "データが蓄積されると詳細な総合分析が表示されます。毎日の記録を続けることで精度が上がります。"
+    if len(analysis) > 300:
+        analysis = analysis[:300]
+    return validated_summaries, analysis
+
 def generate_strategy(sleep_val, cond, judge, scores, missed_tasks, weight_val="-"):
     """Claude APIで今日の推奨作戦を3つ生成"""
     if not ANTHROPIC_API_KEY:
@@ -110,10 +170,11 @@ def generate_strategy(sleep_val, cond, judge, scores, missed_tasks, weight_val="
         text = res.json()["content"][0]["text"].strip()
         start, end = text.find("["), text.rfind("]") + 1
         if start >= 0 and end > start:
-            return _j.loads(text[start:end])
+            raw = _j.loads(text[start:end])
+            return validate_strategies(raw)
     except Exception as e:
         print(f"[WARN] Claude API error: {e}")
-    return []
+    return validate_strategies([])
 
 plan_w  = get_tasks("【W】予定タスク")
 plan_c  = get_tasks("【C】予定タスク")
@@ -844,10 +905,10 @@ def generate_monthly_comment(m_score_w, m_score_c, m_score_ca, m_score_i, m_scor
         start_j, end_j = text.find("{"), text.rfind("}") + 1
         if start_j >= 0 and end_j > start_j:
             parsed = _j.loads(text[start_j:end_j])
-            return parsed.get("summaries", []), parsed.get("analysis", "")
+            return validate_weekly_monthly(parsed)
     except Exception as e:
         print(f"[WARN] Monthly Claude API error: {e}")
-    return [], ""
+    return validate_weekly_monthly({})
 
 monthly_summaries, monthly_analysis = generate_monthly_comment(
     m_score_w, m_score_c, m_score_ca, m_score_i, m_score_total,
@@ -948,10 +1009,10 @@ def generate_weekly_comment(w_score_w, w_score_c, w_score_ca, w_score_i, w_score
         start_j, end_j = text.find("{"), text.rfind("}") + 1
         if start_j >= 0 and end_j > start_j:
             parsed = _j.loads(text[start_j:end_j])
-            return parsed.get("summaries", []), parsed.get("analysis", "")
+            return validate_weekly_monthly(parsed)
     except Exception as e:
         print(f"[WARN] Weekly Claude API error: {e}")
-    return [], ""
+    return validate_weekly_monthly({})
 
 weekly_summaries, weekly_analysis = generate_weekly_comment(
     w_score_w, w_score_c, w_score_ca, w_score_i, w_score_total,
