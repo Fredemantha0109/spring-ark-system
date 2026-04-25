@@ -272,7 +272,7 @@ def category_card(name, subtitle, icon_svg, color, score, plan_tasks, done_tasks
     text_c, icon_wrap, card_border, bar_grad = color_map[color]
     rows = task_rows_html(plan_tasks, done_tasks)
     return (
-        '<div class="ark-card bg-ark-card border ' + card_border + ' rounded-2xl p-4">'
+        '<div class="ark-card bg-ark-card border ' + card_border + ' rounded-2xl p-4 min-h-[120px]">'
         '<div class="flex items-start justify-between mb-3">'
         '<div class="flex items-center gap-2.5">'
         '<div class="w-8 h-8 rounded-xl ' + icon_wrap + ' border flex items-center justify-center flex-shrink-0">'
@@ -667,6 +667,160 @@ for cat_key in ["W", "C", "Ca", "I"]:
     rows = [(t, c) for (t, c), cnt in sorted(task_done_count.items(), key=lambda x: -x[1]) if c == cat_key]
     weekly_task_rows[cat_key] = rows
 
+# ── Monthly集計（過去30日）────────────────────────
+monthly_pages = []
+for i in range(1, 31):
+    d = (datetime.now(sgt) - timedelta(days=i)).strftime("%Y-%m-%d")
+    _, p = fetch_page(d)
+    if p:
+        monthly_pages.append((d, p))
+
+def m_avg(key):
+    vals = []
+    for _, p in monthly_pages:
+        v = p.get(key, {}).get("formula", {}).get("number")
+        if v is not None:
+            vals.append(v)
+    return round(sum(vals) / len(vals)) if vals else 0
+
+m_score_w  = m_avg("【W】スコア")
+m_score_c  = m_avg("【C】スコア")
+m_score_ca = m_avg("【Ca】スコア")
+m_score_i  = m_avg("【I】スコア")
+m_score_total = round((m_score_w + m_score_c + m_score_ca + m_score_i) / 4)
+
+m_weights = [p.get("体重", {}).get("number") for _, p in monthly_pages if p.get("体重", {}).get("number")]
+m_sleeps  = [p.get("睡眠時間", {}).get("number") for _, p in monthly_pages if p.get("睡眠時間", {}).get("number")]
+m_conds   = [p.get("体調", {}).get("select", {}) for _, p in monthly_pages]
+m_cond_names = [c.get("name", "") for c in m_conds if c]
+
+m_weight_avg = round(sum(m_weights) / len(m_weights), 2) if m_weights else "-"
+m_sleep_avg  = round(sum(m_sleeps)  / len(m_sleeps),  2) if m_sleeps  else "-"
+m_cond_counts = {}
+for c in m_cond_names:
+    m_cond_counts[c] = m_cond_counts.get(c, 0) + 1
+if m_cond_counts:
+    m_top_cond = sorted(m_cond_counts.items(), key=lambda x: -x[1])[0]
+    m_cond_summary = f"{m_top_cond[0]}（{m_top_cond[1]}日）"
+else:
+    m_cond_summary = "-"
+
+# 月次タスク実施回数集計
+m_task_done_count = {}
+for _, p in monthly_pages:
+    for cat_key, (done_key, cat_name) in cat_map.items():
+        tasks = [t["name"].lstrip("🔥") for t in p.get(done_key, {}).get("multi_select", [])]
+        for task in tasks:
+            normalized = normalize_task(task)
+            k = (normalized, cat_key)
+            m_task_done_count[k] = m_task_done_count.get(k, 0) + 1
+
+monthly_task_rows = {}
+for cat_key in ["W", "C", "Ca", "I"]:
+    rows = [(t, c) for (t, c), cnt in sorted(m_task_done_count.items(), key=lambda x: -x[1]) if c == cat_key]
+    monthly_task_rows[cat_key] = rows
+
+# Monthly判定
+if m_score_total >= 80:
+    m_judge_label, m_judge_color = "🏅絶好調", "green"
+elif m_score_total >= 50:
+    m_judge_label, m_judge_color = "📊成長中", "amber"
+else:
+    m_judge_label, m_judge_color = "🔄要改善", "red"
+
+m_judge_colors = {
+    "green": ("text-green-400", "border-green-500/25"),
+    "amber": ("text-amber-300", "border-amber-500/25"),
+    "red":   ("text-red-400",   "border-red-500/25"),
+}
+m_judge_text_c, m_judge_border = m_judge_colors[m_judge_color]
+
+# Monthly AIコメント生成
+def generate_monthly_comment(m_score_w, m_score_c, m_score_ca, m_score_i, m_score_total,
+                               m_weight_avg, m_sleep_avg, m_cond_summary, m_task_done_count):
+    if not ANTHROPIC_API_KEY:
+        return [], ""
+    top_tasks = sorted(m_task_done_count.items(), key=lambda x: -x[1])[:12]
+    done_str = "\n".join([f"・{t}({c}): {cnt}回" for (t, c), cnt in top_tasks]) or "なし"
+    prompt = (
+        "あなたはSpring Arkプロジェクトのパーソナルコーチです。\n"
+        "以下の月次データをもとに、月次分析レポートをJSON形式で出力してください。\n\n"
+        f"【今月のコンディション】\n"
+        f"- 体重平均: {m_weight_avg}kg\n"
+        f"- 睡眠平均: {m_sleep_avg}h\n"
+        f"- 体調: {m_cond_summary}\n"
+        f"- 月平均スコア: W:{m_score_w} / C:{m_score_c} / Ca:{m_score_ca} / I:{m_score_i} / 総合:{m_score_total}\n\n"
+        f"【実施できた主なタスク（上位）】\n{done_str}\n\n"
+        "【出力形式】必ずJSONオブジェクトのみ出力してください。他のテキストは一切不要。\n"
+        "{\n"
+        '  "summaries": [\n'
+        '    {"title": "要点タイトル（15文字以内）", "detail": "具体的分析（40文字以内）"},\n'
+        '    {"title": "要点タイトル（15文字以内）", "detail": "具体的分析（40文字以内）"},\n'
+        '    {"title": "要点タイトル（15文字以内）", "detail": "具体的分析（40文字以内）"}\n'
+        "  ],\n"
+        '  "analysis": "体重・睡眠・体調・完了タスク・未達タスクを総合的に踏まえた今月の総合評価・考察・改善提案を200字程度で記載。来月への具体的アクションも含めること。"\n'
+        "}"
+    )
+    import json as _j
+    try:
+        res = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1200, "messages": [{"role": "user", "content": prompt}]},
+            timeout=30
+        )
+        text = res.json()["content"][0]["text"].strip()
+        start_j, end_j = text.find("{"), text.rfind("}") + 1
+        if start_j >= 0 and end_j > start_j:
+            parsed = _j.loads(text[start_j:end_j])
+            return parsed.get("summaries", []), parsed.get("analysis", "")
+    except Exception as e:
+        print(f"[WARN] Monthly Claude API error: {e}")
+    return [], ""
+
+monthly_summaries, monthly_analysis = generate_monthly_comment(
+    m_score_w, m_score_c, m_score_ca, m_score_i, m_score_total,
+    m_weight_avg, m_sleep_avg, m_cond_summary, m_task_done_count
+)
+
+# Monthly右側コメントHTML
+monthly_comment_html = ""
+if monthly_summaries or monthly_analysis:
+    m_items = []
+    for i, s in enumerate(monthly_summaries, 1):
+        m_items.append(
+            f'<div class="flex items-start gap-3 bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">'
+            f'<span class="w-5 h-5 rounded-full bg-violet-500/25 border border-violet-500/35 text-[9px] font-black text-violet-300 flex items-center justify-center flex-shrink-0 mt-0.5">{i}</span>'
+            f'<div><p class="text-xs font-black text-white">{s.get("title","")}</p>'
+            f'<p class="text-[10px] text-ark-muted mt-0.5">{s.get("detail","")}</p></div>'
+            f'</div>'
+        )
+    m_analysis_html = (
+        f'<div class="bg-ark-dim/30 border border-ark-border rounded-xl px-3 py-3 mt-1">'
+        f'<p class="text-[10px] font-black text-violet-400 mb-1.5">総合分析</p>'
+        f'<p class="text-xs text-white/75 leading-relaxed">{monthly_analysis}</p>'
+        f'</div>'
+    ) if monthly_analysis else ""
+    monthly_comment_html = (
+        '<div class="stripe bg-ark-card border border-violet-500/20 rounded-2xl p-4 glow-violet">'
+        '<div class="flex items-center gap-2 mb-4">'
+        '<svg class="w-4 h-4 text-violet-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>'
+        '<p class="text-[10px] font-black text-violet-400 tracking-[.15em]">AI 月次分析</p>'
+        '</div>'
+        '<div class="flex flex-col gap-2">' + "\n".join(m_items) + m_analysis_html + '</div>'
+        '</div>'
+    )
+else:
+    monthly_comment_html = '<p class="text-xs text-ark-muted text-center py-4">月次分析データがありません</p>'
+
+# Monthlyカテゴリカード（週次回数 → 月次回数で流用）
+monthly_cards_html = (
+    weekly_task_card("WELLNESS",      "運動・食事・精神",  ICON_W,  "green", m_score_w,  monthly_task_rows["W"],  ) +
+    weekly_task_card("COMMUNICATION", "英語学習・実践",    ICON_C,  "amber", m_score_c,  monthly_task_rows["C"],  ) +
+    weekly_task_card("CAREER",        "AI・ビジネス・CPA", ICON_CA, "rose",  m_score_ca, monthly_task_rows["Ca"], ) +
+    weekly_task_card("INPUT",         "読書・NewsPicks",   ICON_I,  "sky",   m_score_i,  monthly_task_rows["I"],  )
+)
+
 # Weekly判定
 if w_score_total >= 80:
     w_judge_label, w_judge_color = "\U0001f3fb\u7d76\u597d\u8abf", "green"
@@ -797,7 +951,7 @@ def weekly_task_card(name, subtitle, icon_svg, color, score, task_rows_list):
     else:
         rows_html = '<div class="grid grid-cols-2 gap-x-3 gap-y-0.5">' + items_html + '</div>'
     return (
-        '<div class="ark-card bg-ark-card border ' + card_border + ' rounded-2xl p-4">'
+        '<div class="ark-card bg-ark-card border ' + card_border + ' rounded-2xl p-4 min-h-[120px]">'
         '<div class="flex items-start justify-between mb-3">'
         '<div class="flex items-center gap-2.5">'
         '<div class="w-8 h-8 rounded-xl ' + icon_wrap + ' border flex items-center justify-center flex-shrink-0">'
@@ -1008,8 +1162,32 @@ html = (
     + weekly_comment_html
     + '</div></div></div>'
 
+    # Monthly view
+    + '<div id="monthly-view" style="display:none" class="flex flex-col gap-5">'
+    + f'<section><span class="text-[10px] font-bold text-ark-muted tracking-[.2em] uppercase block mb-2">Monthly Condition</span>'
+    + f'<div class="bg-ark-card border ' + m_judge_border + ' rounded-2xl p-5 glow-amber"><div class="flex flex-col sm:flex-row sm:items-center gap-5">'
+    + '<div class="flex items-center gap-4">'
+    + '<div class="flex items-end gap-2.5">'
+    + f'<div class="flex flex-col items-center gap-1.5"><div class="{"w-8 h-8" if m_judge_label == "🏅絶好調" else "w-5 h-5"} rounded-full {"bg-green-400 shadow-[0_0_14px_rgba(34,197,94,.75)]" if m_judge_label == "🏅絶好調" else "bg-green-500/15 border border-green-500/20"}"></div><span class="text-[8px] {"text-green-400 font-black" if m_judge_label == "🏅絶好調" else "text-green-500/40 font-bold"}">絶好調</span></div>'
+    + f'<div class="flex flex-col items-center gap-1.5"><div class="{"w-8 h-8" if m_judge_label == "📊成長中" else "w-5 h-5"} rounded-full {"bg-amber-400 shadow-[0_0_14px_rgba(251,191,36,.75)]" if m_judge_label == "📊成長中" else "bg-amber-500/15 border border-amber-500/20"}"></div><span class="text-[8px] {"text-amber-400 font-black" if m_judge_label == "📊成長中" else "text-amber-500/40 font-bold"}">成長中</span></div>'
+    + f'<div class="flex flex-col items-center gap-1.5"><div class="{"w-8 h-8" if m_judge_label == "🔄要改善" else "w-5 h-5"} rounded-full {"bg-red-400 shadow-[0_0_14px_rgba(239,68,68,.75)]" if m_judge_label == "🔄要改善" else "bg-red-500/15 border border-red-500/20"}"></div><span class="text-[8px] {"text-red-400 font-black" if m_judge_label == "🔄要改善" else "text-red-500/40 font-bold"}">要改善</span></div>'
+    + '</div>'
+    + '<div class="w-px h-12 bg-ark-border"></div>'
+    + f'<div><p class="text-2xl font-black {m_judge_text_c} leading-none">{m_judge_label}</p></div>'
+    + '</div>'
+    + f'<div class="flex gap-3 sm:ml-auto"><div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-[9px] text-ark-muted mb-1">体重平均</p><p class="text-base font-black text-white">' + str(m_weight_avg) + '<span class="text-xs font-normal text-ark-muted">kg</span></p></div>'
+    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-[9px] text-ark-muted mb-1">睡眠平均</p><p class="text-base font-black text-amber-300">' + str(m_sleep_avg) + '<span class="text-xs font-normal">h</span></p></div>'
+    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[70px]"><p class="text-[9px] text-ark-muted mb-1">体調</p><p class="text-base font-black text-white">' + m_cond_summary + '</p></div>'
+    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-[9px] text-ark-muted mb-1">総合</p><p class="text-base font-black ' + m_judge_text_c + '">' + str(m_score_total) + '<span class="text-xs font-normal text-ark-muted">点</span></p></div>'
+    + '</div></div></div></section>'
+    + '<div class="grid grid-cols-1 md:grid-cols-2 gap-5"><div class="flex flex-col gap-3">'
+    + monthly_cards_html
+    + '</div><div class="flex flex-col gap-4">'
+    + monthly_comment_html
+    + '</div></div></div>'
+
     # タブJS
-    + '<script>function switchTab(t){document.getElementById("daily-view").style.display=t==="daily"?"":"none";document.getElementById("weekly-view").style.display=t==="weekly"?"":"none";var da=t==="daily";document.getElementById("tab-daily").className=da?"tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border":"tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted";document.getElementById("tab-weekly").className=!da?"tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border":"tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted";}</script>'
+    + '<script>var ON="tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border";var OFF="tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted";function switchTab(t){document.getElementById("daily-view").style.display=t==="daily"?"":"none";document.getElementById("weekly-view").style.display=t==="weekly"?"":"none";document.getElementById("monthly-view").style.display=t==="monthly"?"":"none";document.getElementById("tab-daily").className=t==="daily"?ON:OFF;document.getElementById("tab-weekly").className=t==="weekly"?ON:OFF;document.getElementById("tab-monthly").className=t==="monthly"?ON:OFF;}</script>'
 
     "\n  <footer class=\"flex items-center justify-between pt-1 pb-3\">\n"
     "    <p class=\"text-[9px] text-ark-muted\">SPRING ARK &copy; 2026</p>\n"
