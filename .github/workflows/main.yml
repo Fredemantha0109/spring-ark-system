@@ -1,9 +1,7 @@
 name: Spring Ark Scoring System
-
 on:
   repository_dispatch:
     types: [trigger_scoring]
-
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -42,6 +40,9 @@ jobs:
           GH_PAT: ${{ secrets.GH_PAT }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           CALENDAR_DATABASE_ID: ${{ secrets.CALENDAR_DATABASE_ID }}
+          JOURNAL_DATABASE_ID: ${{ secrets.JOURNAL_DATABASE_ID }}
+          JOURNAL_WEEKLY_DATABASE_ID: ${{ secrets.JOURNAL_WEEKLY_DATABASE_ID }}
+          JOURNAL_MONTHLY_DATABASE_ID: ${{ secrets.JOURNAL_MONTHLY_DATABASE_ID }}
         run: python generate_dashboard.py
       - name: Send LINE notification
         env:
