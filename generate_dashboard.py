@@ -73,11 +73,11 @@ def fetch_journal_entries(start_date_str, end_date_str):
             json={
                 "filter": {
                     "and": [
-                        {"property": "日付", "date": {"on_or_after":  start_date_str}},
-                        {"property": "日付", "date": {"on_or_before": end_date_str}},
+                        {"property": "日付元", "date": {"on_or_after":  start_date_str}},
+                        {"property": "日付元", "date": {"on_or_before": end_date_str}},
                     ]
                 },
-                "sorts": [{"property": "日付", "direction": "ascending"}],
+                "sorts": [{"property": "日付元", "direction": "ascending"}],
             },
             timeout=15,
         )
@@ -85,7 +85,7 @@ def fetch_journal_entries(start_date_str, end_date_str):
         entries = []
         for page in res.json().get("results", []):
             props = page["properties"]
-            date_val = (props.get("日付", {}).get("date") or {}).get("start", "")
+            date_val = (props.get("日付元", {}).get("date") or {}).get("start", "")
             entries.append({
                 "date":      date_val,
                 "discharge": _get_rich_text(props, "放電ログ")[:300],
@@ -125,11 +125,11 @@ def fetch_weekly_journal_entries(start_date_str, end_date_str):
             json={
                 "filter": {
                     "and": [
-                        {"property": "日付", "date": {"on_or_after":  start_date_str}},
-                        {"property": "日付", "date": {"on_or_before": end_date_str}},
+                        {"property": "日付元", "date": {"on_or_after":  start_date_str}},
+                        {"property": "日付元", "date": {"on_or_before": end_date_str}},
                     ]
                 },
-                "sorts": [{"property": "日付", "direction": "ascending"}],
+                "sorts": [{"property": "日付元", "direction": "ascending"}],
             },
             timeout=15,
         )
@@ -137,7 +137,7 @@ def fetch_weekly_journal_entries(start_date_str, end_date_str):
         entries = []
         for page in res.json().get("results", []):
             props = page["properties"]
-            date_prop = props.get("日付", {}).get("date") or {}
+            date_prop = props.get("日付元", {}).get("date") or {}
             start = date_prop.get("start", "")
             end   = date_prop.get("end", "")
             entries.append({
