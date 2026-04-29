@@ -1318,14 +1318,62 @@ if monthly_summaries or monthly_analysis:
         f'<p class="text-xs text-white/75 leading-relaxed">{monthly_analysis}</p>'
         f'</div>'
     ) if monthly_analysis else ""
+
+    # スコア分析パネル（タブ1）
+    m_score_panel = (
+        '<div class="flex flex-col gap-2">' + "\n".join(m_items) + m_analysis_html + '</div>'
+    )
+
+    # ジャーナリング分析パネル（タブ2）
+    m_journal_panel = (
+        '<div class="flex flex-col gap-2">'
+        '<p class="text-xs text-ark-muted text-center py-4">ジャーナリングデータがありません</p>'
+        '</div>'
+    )
+    if m_journal_weekly_entries:
+        mj_items = []
+        for e in m_journal_weekly_entries:
+            if e.get("emotion_pattern"):
+                mj_items.append(
+                    f'<div class="bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">'
+                    f'<p class="text-[9px] font-black text-teal-400 mb-1">{e.get("date_range","")} 感情パターン</p>'
+                    f'<p class="text-xs text-white/80 leading-relaxed">{e["emotion_pattern"][:120]}</p>'
+                    f'</div>'
+                )
+            if e.get("needs"):
+                mj_items.append(
+                    f'<div class="bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">'
+                    f'<p class="text-[9px] font-black text-teal-400 mb-1">{e.get("date_range","")} ニーズ</p>'
+                    f'<p class="text-xs text-white/80 leading-relaxed">{e["needs"][:120]}</p>'
+                    f'</div>'
+                )
+        if mj_items:
+            m_journal_panel = '<div class="flex flex-col gap-2">' + "\n".join(mj_items) + '</div>'
+
     monthly_comment_html = (
         '<div class="stripe bg-ark-card border border-violet-500/20 rounded-2xl p-4 glow-violet">'
-        '<div class="flex items-center gap-2 mb-4">'
-        '<svg class="w-4 h-4 text-violet-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"/></svg>'
-        '<p class="text-[10px] font-black text-violet-400 tracking-[.15em]">AI 月次分析</p>'
+        '<div class="flex items-center justify-between mb-4">'
+        '<div class="inline-flex bg-ark-dim rounded-full p-0.5 gap-0.5">'
+        '<button id="m-tab-score" onclick="switchMTab(\'score\')" '
+        'class="m-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border">'
+        'AI分析</button>'
+        '<button id="m-tab-journal" onclick="switchMTab(\'journal\')" '
+        'class="m-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted">'
+        '🔒 ジャーナリング</button>'
+        '</div></div>'
+        '<div id="m-panel-score">' + m_score_panel + '</div>'
+        '<div id="m-panel-journal" style="display:none">' + m_journal_panel + '</div>'
         '</div>'
-        '<div class="flex flex-col gap-2">' + "\n".join(m_items) + m_analysis_html + '</div>'
-        '</div>'
+        '<script>'
+        'function switchMTab(t){'
+        '  var ON="m-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border";'
+        '  var OFF="m-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted";'
+        '  document.getElementById("m-panel-score").style.display=t==="score"?"":"none";'
+        '  document.getElementById("m-panel-journal").style.display=t==="journal"?"":"none";'
+        '  document.getElementById("m-tab-score").className=t==="score"?ON:OFF;'
+        '  document.getElementById("m-tab-journal").className=t==="journal"?ON:OFF;'
+        '}'
+        '</script>'
     )
 else:
     monthly_comment_html = '<p class="text-xs text-ark-muted text-center py-4">月次分析データがありません</p>'
@@ -1368,14 +1416,74 @@ if weekly_summaries or weekly_analysis:
         f'<p class="text-xs text-white/75 leading-relaxed">{weekly_analysis}</p>'
         f'</div>'
     ) if weekly_analysis else ""
+
+    # スコア分析パネル（タブ1）
+    score_panel = (
+        '<div class="flex flex-col gap-2">' + "\n".join(items) + analysis_html + '</div>'
+    )
+
+    # ジャーナリング分析パネル（タブ2）- generate_weekly_commentの結果からNVC部分を別表示
+    journal_panel = (
+        '<div class="flex flex-col gap-2">'
+        '<p class="text-xs text-ark-muted text-center py-4">ジャーナリングデータがありません</p>'
+        '</div>'
+    )
+    if w_journal_entries or w_journal_weekly_entries:
+        j_items = []
+        # Weekly Journalまとめがあれば表示
+        for e in (w_journal_weekly_entries or []):
+            if e.get("emotion_pattern"):
+                j_items.append(
+                    f'<div class="bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">'
+                    f'<p class="text-[9px] font-black text-teal-400 mb-1">感情パターン</p>'
+                    f'<p class="text-xs text-white/80 leading-relaxed">{e["emotion_pattern"][:150]}</p>'
+                    f'</div>'
+                )
+            if e.get("needs"):
+                j_items.append(
+                    f'<div class="bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">'
+                    f'<p class="text-[9px] font-black text-teal-400 mb-1">奥にあるニーズ</p>'
+                    f'<p class="text-xs text-white/80 leading-relaxed">{e["needs"][:150]}</p>'
+                    f'</div>'
+                )
+            if e.get("next_question"):
+                j_items.append(
+                    f'<div class="bg-ark-dim/40 border border-teal-500/20 rounded-xl px-3 py-2.5">'
+                    f'<p class="text-[9px] font-black text-teal-400 mb-1">来週への問い</p>'
+                    f'<p class="text-xs text-white/80 leading-relaxed">{e["next_question"][:100]}</p>'
+                    f'</div>'
+                )
+        if j_items:
+            journal_panel = '<div class="flex flex-col gap-2">' + "\n".join(j_items) + '</div>'
+
     weekly_comment_html = (
         '<div class="stripe bg-ark-card border border-violet-500/20 rounded-2xl p-4 glow-violet">'
-        '<div class="flex items-center gap-2 mb-4">'
-        '<svg class="w-4 h-4 text-violet-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>'
-        '<p class="text-[10px] font-black text-violet-400 tracking-[.15em]">AI 週次分析</p>'
+        # タブヘッダー
+        '<div class="flex items-center justify-between mb-4">'
+        '<div class="inline-flex bg-ark-dim rounded-full p-0.5 gap-0.5">'
+        '<button id="w-tab-score" onclick="switchWTab(\'score\')" '
+        'class="w-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border">'
+        'AI分析</button>'
+        '<button id="w-tab-journal" onclick="switchWTab(\'journal\')" '
+        'class="w-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted">'
+        '🔒 ジャーナリング</button>'
+        '</div></div>'
+        # スコア分析パネル
+        '<div id="w-panel-score">' + score_panel + '</div>'
+        # ジャーナリングパネル（デフォルト非表示）
+        '<div id="w-panel-journal" style="display:none">' + journal_panel + '</div>'
         '</div>'
-        '<div class="flex flex-col gap-2">' + "\n".join(items) + analysis_html + '</div>'
-        '</div>'
+        # タブ切り替えJS
+        '<script>'
+        'function switchWTab(t){'
+        '  var ON="w-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border";'
+        '  var OFF="w-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted";'
+        '  document.getElementById("w-panel-score").style.display=t==="score"?"":"none";'
+        '  document.getElementById("w-panel-journal").style.display=t==="journal"?"":"none";'
+        '  document.getElementById("w-tab-score").className=t==="score"?ON:OFF;'
+        '  document.getElementById("w-tab-journal").className=t==="journal"?ON:OFF;'
+        '}'
+        '</script>'
     )
 else:
     weekly_comment_html = '<p class="text-xs text-ark-muted text-center py-4">週次分析データがありません</p>'
