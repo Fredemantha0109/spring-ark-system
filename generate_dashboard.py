@@ -260,6 +260,7 @@ def build_monthly_journal_section(monthly_entries):
     )
 
 
+def build_journal_prompt_section(entries, max_days=7):
     """
     ジャーナリングエントリをWeeklyプロンプト用テキストに整形する。
     エントリがない場合は空文字を返す。
