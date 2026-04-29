@@ -1337,14 +1337,14 @@ if monthly_summaries or monthly_analysis:
                 mj_items.append(
                     f'<div class="bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">'
                     f'<p class="text-[9px] font-black text-teal-400 mb-1">{e.get("date_range","")} 感情パターン</p>'
-                    f'<p class="text-xs text-white/80 leading-relaxed">{e["emotion_pattern"][:120]}</p>'
+                    f'<p class="text-xs text-white/80 leading-relaxed">{e["emotion_pattern"][:300]}</p>'
                     f'</div>'
                 )
             if e.get("needs"):
                 mj_items.append(
                     f'<div class="bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">'
                     f'<p class="text-[9px] font-black text-teal-400 mb-1">{e.get("date_range","")} ニーズ</p>'
-                    f'<p class="text-xs text-white/80 leading-relaxed">{e["needs"][:120]}</p>'
+                    f'<p class="text-xs text-white/80 leading-relaxed">{e["needs"][:300]}</p>'
                     f'</div>'
                 )
         if mj_items:
@@ -1436,21 +1436,21 @@ if weekly_summaries or weekly_analysis:
                 j_items.append(
                     f'<div class="bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">'
                     f'<p class="text-[9px] font-black text-teal-400 mb-1">感情パターン</p>'
-                    f'<p class="text-xs text-white/80 leading-relaxed">{e["emotion_pattern"][:150]}</p>'
+                    f'<p class="text-xs text-white/80 leading-relaxed">{e["emotion_pattern"][:300]}</p>'
                     f'</div>'
                 )
             if e.get("needs"):
                 j_items.append(
                     f'<div class="bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">'
                     f'<p class="text-[9px] font-black text-teal-400 mb-1">奥にあるニーズ</p>'
-                    f'<p class="text-xs text-white/80 leading-relaxed">{e["needs"][:150]}</p>'
+                    f'<p class="text-xs text-white/80 leading-relaxed">{e["needs"][:300]}</p>'
                     f'</div>'
                 )
             if e.get("next_question"):
                 j_items.append(
                     f'<div class="bg-ark-dim/40 border border-teal-500/20 rounded-xl px-3 py-2.5">'
                     f'<p class="text-[9px] font-black text-teal-400 mb-1">来週への問い</p>'
-                    f'<p class="text-xs text-white/80 leading-relaxed">{e["next_question"][:100]}</p>'
+                    f'<p class="text-xs text-white/80 leading-relaxed">{e["next_question"][:200]}</p>'
                     f'</div>'
                 )
         if j_items:
