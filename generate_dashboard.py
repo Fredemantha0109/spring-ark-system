@@ -1,5 +1,6 @@
 """
 generate_dashboard.py — Notionからデータを取得してHTMLダッシュボードを生成し、Surgeにデプロイする
+v2: ジャーナリングDB連携追加（NVC感情分析をWeekly/Monthly AIコメントに統合）
 
 実行タイミング:
     GitHub Actions内でcalc_score.pyの後に実行される
@@ -12,11 +13,14 @@ import requests
 from datetime import datetime, timezone, timedelta
 
 # ── 環境変数 ──────────────────────────────────────
-NOTION_TOKEN        = os.environ["NOTION_TOKEN"]
-DATABASE_ID         = os.environ["DATABASE_ID"]
-SURGE_TOKEN         = os.environ["SURGE_TOKEN"]
-SURGE_DOMAIN        = os.environ["SURGE_DOMAIN"]
+NOTION_TOKEN         = os.environ["NOTION_TOKEN"]
+DATABASE_ID          = os.environ["DATABASE_ID"]
+SURGE_TOKEN          = os.environ["SURGE_TOKEN"]
+SURGE_DOMAIN         = os.environ["SURGE_DOMAIN"]
 CALENDAR_DATABASE_ID = os.environ.get("CALENDAR_DATABASE_ID", "")
+JOURNAL_DATABASE_ID          = os.environ.get("JOURNAL_DATABASE_ID", "")
+JOURNAL_WEEKLY_DATABASE_ID   = os.environ.get("JOURNAL_WEEKLY_DATABASE_ID", "")
+JOURNAL_MONTHLY_DATABASE_ID  = os.environ.get("JOURNAL_MONTHLY_DATABASE_ID", "")
 
 HEADERS = {
     "Authorization": f"Bearer {NOTION_TOKEN}",
@@ -40,6 +44,281 @@ def fetch_page(date_str):
         return None, None
     return results[0]["id"], results[0]["properties"]
 
+# ── ▼ ジャーナリング取得ユーティリティ ──────────────
+def _get_rich_text(props, key):
+    """Notion rich_text プロパティからプレーンテキストを取得する"""
+    items = props.get(key, {}).get("rich_text", [])
+    return "".join([t.get("plain_text", "") for t in items])
+
+
+def fetch_journal_entries(start_date_str, end_date_str):
+    """
+    指定期間のジャーナリングDBエントリを取得する。
+
+    Args:
+        start_date_str: "YYYY-MM-DD" 形式の開始日（含む）
+        end_date_str:   "YYYY-MM-DD" 形式の終了日（含む）
+
+    Returns:
+        list[dict]: エントリのリスト
+    """
+    if not JOURNAL_DATABASE_ID:
+        print("[INFO] JOURNAL_DATABASE_ID が未設定のためジャーナリング取得をスキップ")
+        return []
+
+    try:
+        res = requests.post(
+            f"https://api.notion.com/v1/databases/{JOURNAL_DATABASE_ID}/query",
+            headers=HEADERS,
+            json={
+                "filter": {
+                    "and": [
+                        {"property": "日付", "date": {"on_or_after":  start_date_str}},
+                        {"property": "日付", "date": {"on_or_before": end_date_str}},
+                    ]
+                },
+                "sorts": [{"property": "日付", "direction": "ascending"}],
+            },
+            timeout=15,
+        )
+        res.raise_for_status()
+        entries = []
+        for page in res.json().get("results", []):
+            props = page["properties"]
+            date_val = (props.get("日付", {}).get("date") or {}).get("start", "")
+            entries.append({
+                "date":      date_val,
+                "discharge": _get_rich_text(props, "放電ログ")[:300],
+                "charge":    _get_rich_text(props, "充電ログ")[:300],
+                "emotion":   _get_rich_text(props, "感情と観察")[:300],
+                "needs":     _get_rich_text(props, "奥にあるニーズ")[:200],
+                "message":   _get_rich_text(props, "今日への一言")[:100],
+            })
+        print(f"[OK] ジャーナリング取得: {len(entries)}件 ({start_date_str} 〜 {end_date_str})")
+        return entries
+
+    except Exception as e:
+        print(f"[WARN] ジャーナリング取得エラー: {e}")
+        return []
+
+
+def fetch_weekly_journal_entries(start_date_str, end_date_str):
+    """
+    指定期間のWeekly JournalDBエントリを取得する。
+
+    Returns:
+        list[dict]: エントリのリスト。キー:
+            date_range       - 期間（"start〜end"）
+            emotion_pattern  - 感情パターン
+            needs            - 奥にあるニーズ
+            env_relation     - 環境・状況との関係
+            next_question    - 来週への一つの問い
+    """
+    if not JOURNAL_WEEKLY_DATABASE_ID:
+        print("[INFO] JOURNAL_WEEKLY_DATABASE_ID が未設定のためWeeklyジャーナリング取得をスキップ")
+        return []
+
+    try:
+        res = requests.post(
+            f"https://api.notion.com/v1/databases/{JOURNAL_WEEKLY_DATABASE_ID}/query",
+            headers=HEADERS,
+            json={
+                "filter": {
+                    "and": [
+                        {"property": "日付", "date": {"on_or_after":  start_date_str}},
+                        {"property": "日付", "date": {"on_or_before": end_date_str}},
+                    ]
+                },
+                "sorts": [{"property": "日付", "direction": "ascending"}],
+            },
+            timeout=15,
+        )
+        res.raise_for_status()
+        entries = []
+        for page in res.json().get("results", []):
+            props = page["properties"]
+            date_prop = props.get("日付", {}).get("date") or {}
+            start = date_prop.get("start", "")
+            end   = date_prop.get("end", "")
+            entries.append({
+                "date_range":      f"{start}〜{end}" if end else start,
+                "emotion_pattern": _get_rich_text(props, "感情パターン")[:200],
+                "needs":           _get_rich_text(props, "奥にあるニーズ")[:200],
+                "env_relation":    _get_rich_text(props, "環境・状況との関係")[:200],
+                "next_question":   _get_rich_text(props, "来週への一つの問い")[:100],
+            })
+        print(f"[OK] Weekly Journal取得: {len(entries)}件 ({start_date_str} 〜 {end_date_str})")
+        return entries
+
+    except Exception as e:
+        print(f"[WARN] Weekly Journal取得エラー: {e}")
+        return []
+
+
+def fetch_monthly_journal_entries(start_date_str, end_date_str):
+    """
+    指定期間のMonthly JournalDBエントリを取得する（運用開始後に有効化）。
+
+    Returns:
+        list[dict]: エントリのリスト。キー:
+            date_range        - 対象月
+            emotion_structure - 今月の感情パターン（構造レベル）
+            charge_discharge  - 充電源と放電源のトップ3
+            needs_priority    - ニーズの優先順位
+            habit_emotion     - 行動と感情の相関
+            next_experiment   - 来月への設計提案
+    """
+    if not JOURNAL_MONTHLY_DATABASE_ID:
+        print("[INFO] JOURNAL_MONTHLY_DATABASE_ID が未設定のためMonthlyジャーナリング取得をスキップ")
+        return []
+
+    try:
+        res = requests.post(
+            f"https://api.notion.com/v1/databases/{JOURNAL_MONTHLY_DATABASE_ID}/query",
+            headers=HEADERS,
+            json={
+                "filter": {
+                    "and": [
+                        {"property": "日付", "date": {"on_or_after":  start_date_str}},
+                        {"property": "日付", "date": {"on_or_before": end_date_str}},
+                    ]
+                },
+                "sorts": [{"property": "日付", "direction": "ascending"}],
+            },
+            timeout=15,
+        )
+        res.raise_for_status()
+        entries = []
+        for page in res.json().get("results", []):
+            props = page["properties"]
+            date_prop = props.get("日付", {}).get("date") or {}
+            start = date_prop.get("start", "")
+            end   = date_prop.get("end", "")
+            entries.append({
+                "date_range":        f"{start}〜{end}" if end else start,
+                "emotion_structure": _get_rich_text(props, "今月の感情パターン")[:300],
+                "charge_discharge":  _get_rich_text(props, "充電源と放電源のトップ3")[:300],
+                "needs_priority":    _get_rich_text(props, "ニーズの優先順位")[:200],
+                "habit_emotion":     _get_rich_text(props, "行動と感情の相関")[:200],
+                "next_experiment":   _get_rich_text(props, "来月への設計提案")[:200],
+            })
+        print(f"[OK] Monthly Journal取得: {len(entries)}件 ({start_date_str} 〜 {end_date_str})")
+        return entries
+
+    except Exception as e:
+        print(f"[WARN] Monthly Journal取得エラー: {e}")
+        return []
+
+
+def build_weekly_journal_section(weekly_entries):
+    """
+    Weekly Journalエントリをプロンプト用テキストに整形する。
+    Claudeが既に週次まとめを作っているので、そのまま高品質なインプットになる。
+    """
+    if not weekly_entries:
+        return ""
+    lines = []
+    for e in weekly_entries:
+        parts = []
+        if e["emotion_pattern"]: parts.append(f"感情パターン:{e['emotion_pattern'][:100]}")
+        if e["needs"]:           parts.append(f"ニーズ:{e['needs'][:100]}")
+        if e["env_relation"]:    parts.append(f"環境との関係:{e['env_relation'][:80]}")
+        if e["next_question"]:   parts.append(f"来週への問い:{e['next_question'][:60]}")
+        if parts:
+            lines.append(f"[{e['date_range']}] " + " / ".join(parts))
+    if not lines:
+        return ""
+    return (
+        "\n【週次ジャーナリングまとめ（NVC観点）】\n"
+        + "\n".join(lines)
+        + "\n"
+    )
+
+
+def build_monthly_journal_section(monthly_entries):
+    """
+    Monthly Journalエントリをプロンプト用テキストに整形する。
+    運用開始前は空文字を返す。
+    """
+    if not monthly_entries:
+        return ""
+    lines = []
+    for e in monthly_entries:
+        parts = []
+        if e["emotion_structure"]: parts.append(f"感情構造:{e['emotion_structure'][:120]}")
+        if e["charge_discharge"]:  parts.append(f"充放電:{e['charge_discharge'][:120]}")
+        if e["needs_priority"]:    parts.append(f"ニーズ優先度:{e['needs_priority'][:80]}")
+        if e["next_experiment"]:   parts.append(f"来月実験:{e['next_experiment'][:80]}")
+        if parts:
+            lines.append(f"[{e['date_range']}] " + " / ".join(parts))
+    if not lines:
+        return ""
+    return (
+        "\n【月次ジャーナリングまとめ】\n"
+        + "\n".join(lines)
+        + "\n"
+    )
+
+
+    """
+    ジャーナリングエントリをWeeklyプロンプト用テキストに整形する。
+    エントリがない場合は空文字を返す。
+    """
+    if not entries:
+        return ""
+
+    lines = []
+    for e in entries[:max_days]:
+        parts = []
+        if e["discharge"]: parts.append(f"放電:{e['discharge'][:80]}")
+        if e["charge"]:    parts.append(f"充電:{e['charge'][:80]}")
+        if e["needs"]:     parts.append(f"ニーズ:{e['needs'][:80]}")
+        if e["emotion"]:   parts.append(f"感情:{e['emotion'][:60]}")
+        if parts:
+            lines.append(f"[{e['date']}] " + " / ".join(parts))
+
+    if not lines:
+        return ""
+
+    return (
+        "\n【今週のジャーナリング（NVC観点）】\n"
+        + "\n".join(lines)
+        + "\n"
+    )
+
+
+def build_journal_monthly_section(entries):
+    """
+    ジャーナリングエントリをMonthlyプロンプト用テキストに整形する（週単位で圧縮）。
+    """
+    if not entries:
+        return ""
+
+    chunks = [entries[i:i+7] for i in range(0, len(entries), 7)]
+    lines = []
+    for week_idx, chunk in enumerate(chunks, 1):
+        discharges = [e["discharge"][:40] for e in chunk if e["discharge"]]
+        charges    = [e["charge"][:40]    for e in chunk if e["charge"]]
+        needs_list = [e["needs"][:40]     for e in chunk if e["needs"]]
+        if discharges or needs_list:
+            lines.append(
+                f"[Week{week_idx}] "
+                f"放電:{' / '.join(discharges[:3])} | "
+                f"充電:{' / '.join(charges[:3])} | "
+                f"ニーズ:{' / '.join(needs_list[:3])}"
+            )
+
+    if not lines:
+        return ""
+
+    return (
+        "\n【今月のジャーナリング週次サマリー（NVC観点）】\n"
+        + "\n".join(lines)
+        + "\n"
+    )
+# ── ▲ ジャーナリング取得ユーティリティ ここまで ──────
+
+
 # ── 今日のページ（体重・睡眠・体調）+ 昨日のページ（スコア・タスク）──
 today_page_id,     props_today     = fetch_page(today)
 yesterday_page_id, props_yesterday = fetch_page(yesterday)
@@ -48,7 +327,6 @@ if not props_yesterday:
     print(f"[WARN] {yesterday} のページが見つかりません")
     exit(1)
 
-# 今日のページが未作成の場合は昨日で代用
 if not props_today:
     print(f"[INFO] {today} のページが未作成のため昨日のデータで代用")
     props_today   = props_yesterday
@@ -67,40 +345,31 @@ score_ca = get_score("【Ca】スコア")
 score_i  = get_score("【I】スコア")
 score_total = round((score_w + score_c + score_ca + score_i) / 4)
 
-# 体重・睡眠・体調は今日のページから
 weight    = props_today.get("体重", {}).get("number") or "-"
 sleep     = props_today.get("睡眠時間", {}).get("number") or "-"
 condition = (props_today.get("体調", {}).get("select") or {}).get("name", "-")
+
 # ── Claude APIで推奨作戦を生成 ──────────────────────
 import json as _json
 
 ANTHROPIC_API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
 
-# ── JSON出力バリデーション（コードでブレをなくす）────────────
+# ── JSON出力バリデーション ─────────────────────────
 def validate_strategy(item):
-    """作戦1件をバリデーション・補完して返す"""
     if not isinstance(item, dict):
         return {"title": "今日も着実に前進", "detail": "基本タスクを1つずつ丁寧に実施する"}
     title  = str(item.get("title", "")).strip()
     detail = str(item.get("detail", "")).strip()
-    # 必須フィールドが空なら補完
-    if not title:
-        title = "今日も着実に前進"
-    if not detail:
-        detail = "基本タスクを1つずつ丁寧に実施する"
-    # 文字数上限（超過はトリミング）
-    if len(title) > 20:
-        title = title[:20]
-    if len(detail) > 50:
-        detail = detail[:50]
+    if not title:  title  = "今日も着実に前進"
+    if not detail: detail = "基本タスクを1つずつ丁寧に実施する"
+    if len(title)  > 20: title  = title[:20]
+    if len(detail) > 50: detail = detail[:50]
     return {"title": title, "detail": detail}
 
 def validate_strategies(raw):
-    """作戦リストをバリデーション・補完して3件保証で返す"""
     if not isinstance(raw, list):
         raw = []
     validated = [validate_strategy(item) for item in raw[:3]]
-    # 3件未満なら補完
     defaults = [
         {"title": "基本タスクを実施", "detail": "今日の予定タスクを1つずつ確実にこなす"},
         {"title": "コンディション維持", "detail": "睡眠・食事・運動のバランスを意識する"},
@@ -111,10 +380,8 @@ def validate_strategies(raw):
     return validated
 
 def validate_weekly_monthly(parsed):
-    """Weekly/Monthly分析レポートをバリデーション・補完して返す"""
     if not isinstance(parsed, dict):
         parsed = {}
-    # summariesのバリデーション
     summaries = parsed.get("summaries", [])
     if not isinstance(summaries, list):
         summaries = []
@@ -125,10 +392,8 @@ def validate_weekly_monthly(parsed):
         t = str(s.get("title", "")).strip()[:20] or "分析中"
         d = str(s.get("detail", "")).strip()[:50] or "データを確認中です"
         validated_summaries.append({"title": t, "detail": d})
-    # 3件未満なら補完
     while len(validated_summaries) < 3:
         validated_summaries.append({"title": "データ収集中", "detail": "記録が蓄積されると詳細な分析が表示されます"})
-    # analysisのバリデーション
     analysis = str(parsed.get("analysis", "")).strip()
     if not analysis:
         analysis = "データが蓄積されると詳細な総合分析が表示されます。毎日の記録を続けることで精度が上がります。"
@@ -137,26 +402,25 @@ def validate_weekly_monthly(parsed):
     return validated_summaries, analysis
 
 def generate_strategy(sleep_val, cond, judge, scores, missed_tasks, weight_val="-"):
-    """Claude APIで今日の推奨作戦を3つ生成"""
     if not ANTHROPIC_API_KEY:
         return []
-    missed_str = "\n".join([f"\u30fb{cat}: {task}" for task, cat in missed_tasks]) or "\u306a\u3057"
+    missed_str = "\n".join([f"・{cat}: {task}" for task, cat in missed_tasks]) or "なし"
     score_str  = f"W:{scores[0]} / C:{scores[1]} / Ca:{scores[2]} / I:{scores[3]}"
     prompt = (
-        "\u3042\u306a\u305f\u306fSpring Ark\u30d7\u30ed\u30b8\u30a7\u30af\u30c8\u306e\u30d1\u30fc\u30bd\u30ca\u30eb\u30b3\u30fc\u30c1\u3067\u3059\u3002\n"
-        "\u4ee5\u4e0b\u306e\u30c7\u30fc\u30bf\u3092\u3082\u3068\u306b\u3001\u4eca\u65e5\u306e\u5177\u4f53\u7684\u306a\u63a8\u5968\u4f5c\u6226\u30923\u3064\u3001JSON\u5f62\u5f0f\u3067\u51fa\u529b\u3057\u3066\u304f\u3060\u3055\u3044\u3002\n\n"
-        f"\u3010\u4eca\u65e5\u306e\u30b3\u30f3\u30c7\u30a3\u30b7\u30e7\u30f3\u3011\n"
-        f"- \u7751\u7720: {sleep_val}h\n"
-        f"- \u4f53\u8abf: {cond}\n"
-        f"- \u4f53\u91cd: {weight_val}kg\n"
-        f"- \u7dcf\u5408\u5224\u5b9a: {judge}\n"
-        f"- \u30b9\u30b3\u30a2: {score_str}\n\n"
-        f"\u3010\u6628\u65e5\u306e\u672a\u9054\u30bf\u30b9\u30af\u3011\n{missed_str}\n\n"
-        "\u3010\u51fa\u529b\u5f62\u5f0f\u3011\u5fc5\u305aJSON\u914d\u5217\u306e\u307f\u51fa\u529b\u3057\u3066\u304f\u3060\u3055\u3044\u3002\u4ed6\u306e\u30c6\u30ad\u30b9\u30c8\u306f\u4e00\u5207\u4e0d\u8981\u3002\n"
+        "あなたはSpring Arkプロジェクトのパーソナルコーチです。\n"
+        "以下のデータをもとに、今日の具体的な推奨作戦を3つ、JSON形式で出力してください。\n\n"
+        f"【今日のコンディション】\n"
+        f"- 睡眠: {sleep_val}h\n"
+        f"- 体調: {cond}\n"
+        f"- 体重: {weight_val}kg\n"
+        f"- 総合判定: {judge}\n"
+        f"- スコア: {score_str}\n\n"
+        f"【昨日の未達タスク】\n{missed_str}\n\n"
+        "【出力形式】必ずJSON配列のみ出力してください。他のテキストは一切不要。\n"
         '[\n'
-        '  {"title": "\u4f5c\u6226\u30bf\u30a4\u30c8\u30eb\uff0815\u6587\u5b57\u4ee5\u5185\uff09", "detail": "\u5177\u4f53\u7684\u306a\u884c\u52d5\uff0830\u6587\u5b57\u4ee5\u5185\uff09"},\n'
-        '  {"title": "\u4f5c\u6226\u30bf\u30a4\u30c8\u30eb\uff0815\u6587\u5b57\u4ee5\u5185\uff09", "detail": "\u5177\u4f53\u7684\u306a\u884c\u52d5\uff0830\u6587\u5b57\u4ee5\u5185\uff09"},\n'
-        '  {"title": "\u4f5c\u6226\u30bf\u30a4\u30c8\u30eb\uff0815\u6587\u5b57\u4ee5\u5185\uff09", "detail": "\u5177\u4f53\u7684\u306a\u884c\u52d5\uff0830\u6587\u5b57\u4ee5\u5185\uff09"}\n'
+        '  {"title": "作戦タイトル（15文字以内）", "detail": "具体的な行動（30文字以内）"},\n'
+        '  {"title": "作戦タイトル（15文字以内）", "detail": "具体的な行動（30文字以内）"},\n'
+        '  {"title": "作戦タイトル（15文字以内）", "detail": "具体的な行動（30文字以内）"}\n'
         ']'
     )
     import json as _j
@@ -185,7 +449,6 @@ done_c  = get_tasks("【C】実績")
 done_ca = get_tasks("【Ca】実績")
 done_i  = get_tasks("【I】実績")
 
-# 未達タスクを収集（昨日）
 missed_tasks_all = []
 for task in plan_w:
     clean = task.lstrip("🔥")
@@ -207,18 +470,15 @@ for task in plan_i:
 # ── 判定（睡眠時間 × 体調）────────────────────────
 def calc_judge(sleep_val, cond):
     s = sleep_val if isinstance(sleep_val, (int, float)) else 0
-    # 🟢 良好
     if (s >= 7 and cond in ("好調", "普通")) or (5.5 <= s < 7 and cond == "好調"):
         return "良好", "green"
-    # 🔴 危険
     if (5.5 <= s < 7 and cond == "不調") or (s < 5.5 and cond in ("普通", "不調")):
         return "危険", "red"
-    # 🟡 要注意（残り全パターン）
     return "要注意", "amber"
 
 judge_label, judge_color = calc_judge(sleep, condition)
 
-ai_note = ""  # 後方互換のため残す
+ai_note = ""
 ai_strategies = generate_strategy(
     sleep, condition, judge_label,
     [score_w, score_c, score_ca, score_i],
@@ -235,7 +495,6 @@ CATEGORIES = {
 }
 
 def fetch_past_pages(n=5):
-    """過去n日分のページを取得（今日を除く）"""
     pages_data = []
     for i in range(1, n + 1):
         d = (datetime.now(sgt) - timedelta(days=i)).strftime("%Y-%m-%d")
@@ -246,13 +505,11 @@ def fetch_past_pages(n=5):
 
 past_pages = fetch_past_pages(5)
 
-# ① 過去5日で未達回数が最多のタスク
-miss_count = {}   # {(task_name, category): 未達回数}
+miss_count = {}
 for date_str, p in past_pages:
     for cat, (plan_key, done_key) in CATEGORIES.items():
         plan = [t["name"] for t in p.get(plan_key, {}).get("multi_select", [])]
         done = [t["name"] for t in p.get(done_key, {}).get("multi_select", [])]
-        # 🔥を除いた名前で比較
         plan_clean = [t.lstrip("🔥") for t in plan]
         done_clean = [t.lstrip("🔥") for t in done]
         for task in plan_clean:
@@ -260,13 +517,12 @@ for date_str, p in past_pages:
                 key = (task, cat)
                 miss_count[key] = miss_count.get(key, 0) + 1
 
-candidate_1 = None  # (task_name, category, miss_count)
+candidate_1 = None
 if miss_count:
     top = sorted(miss_count.items(), key=lambda x: -x[1])[0]
     candidate_1 = (top[0][0], top[0][1], top[1])
 
-# ② 最後に完了した日が最も遠いタスク（過去5日に予定があったもの）
-last_done = {}  # {(task_name, category): 最後に完了した日付文字列}
+last_done = {}
 for date_str, p in past_pages:
     for cat, (plan_key, done_key) in CATEGORIES.items():
         done = [t["name"].lstrip("🔥") for t in p.get(done_key, {}).get("multi_select", [])]
@@ -280,13 +536,11 @@ for date_str, p in past_pages:
                 if key not in last_done:
                     last_done[key] = "never"
 
-candidate_2 = None  # (task_name, category, last_done_date)
+candidate_2 = None
 if last_done:
-    # "never" > 日付文字列 なので最も遠い = 最も小さい日付 or never
     def sort_key(x):
         return x[1] if x[1] != "never" else "0000-00-00"
     oldest = sorted(last_done.items(), key=lambda x: sort_key(x))[0]
-    # candidate_1と同じタスクの場合は次点を取得
     for item in sorted(last_done.items(), key=lambda x: sort_key(x)):
         if candidate_1 is None or item[0][0] != candidate_1[0]:
             candidate_2 = (item[0][0], item[0][1], item[1])
@@ -322,7 +576,6 @@ def task_rows_html(plan_tasks, done_tasks):
         )
     return '<div class="grid grid-cols-2 gap-x-3 gap-y-0.5">' + "\n".join(items) + '</div>'
 
-# ── カテゴリカードHTML ────────────────────────────
 def category_card(name, subtitle, icon_svg, color, score, plan_tasks, done_tasks):
     color_map = {
         "green": ("text-green-400", "bg-green-500/10 border-green-500/20", "border-ark-border",   "from-green-600 to-emerald-400"),
@@ -354,13 +607,11 @@ def category_card(name, subtitle, icon_svg, color, score, plan_tasks, done_tasks
         + '</div>'
     )
 
-# アイコンSVG
 ICON_W  = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z"/><path d="M3.22 12H9.5l.5-1 2 4.5 2-7 1.5 3.5h5.27"/></svg>'
 ICON_C  = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>'
 ICON_CA = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>'
 ICON_I  = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>'
 
-# AI提案テキスト整形
 ai_html = ""
 if ai_note:
     lines = ai_note.strip().split("\n")
@@ -378,7 +629,6 @@ if ai_note:
 
 ai_section_inner = ai_html if ai_html else '<p class="text-xs text-ark-muted text-center py-4">昨日の未達タスクなし 🎉</p>'
 
-# ── 推奨作戦パネルHTML ────────────────────────────
 strategy_html = ""
 if ai_strategies:
     items_html = []
@@ -401,12 +651,10 @@ if ai_strategies:
         '</div></div>'
     )
 
-# ── SYSTEM TRIGGER（危険時のみ表示）────────────────
 # ── カレンダーDB取得 ──────────────────────────────
 calendar_events = []
 if CALENDAR_DATABASE_ID:
     try:
-        # 今日の日付範囲（SGT）
         today_start = today + "T00:00:00+08:00"
         today_end   = today + "T23:59:59+08:00"
         cal_res = requests.post(
@@ -415,11 +663,11 @@ if CALENDAR_DATABASE_ID:
             json={
                 "filter": {
                     "and": [
-                        {"property": "\u65e5\u4ed8", "date": {"on_or_after": today_start}},
-                        {"property": "\u65e5\u4ed8", "date": {"on_or_before": today_end}}
+                        {"property": "日付", "date": {"on_or_after": today_start}},
+                        {"property": "日付", "date": {"on_or_before": today_end}}
                     ]
                 },
-                "sorts": [{"property": "\u65e5\u4ed8", "direction": "ascending"}]
+                "sorts": [{"property": "日付", "direction": "ascending"}]
             }
         )
         cal_data = cal_res.json()
@@ -427,22 +675,20 @@ if CALENDAR_DATABASE_ID:
         for page in cal_data.get("results", []):
             props = page["properties"]
             name = ""
-            name_prop = props.get("\u540d\u524d", {})
+            name_prop = props.get("名前", {})
             if name_prop.get("title"):
                 name = name_prop["title"][0].get("plain_text", "")
-            date_prop = props.get("\u65e5\u4ed8", {}).get("date", {}) or {}
+            date_prop = props.get("日付", {}).get("date", {}) or {}
             start = date_prop.get("start", "")
             end   = date_prop.get("end", "")
-            # 時刻部分だけ抽出（日付のみの場合はスキップ）
             if "T" in start:
-                start_time = start[11:16]  # HH:MM
+                start_time = start[11:16]
                 end_time   = end[11:16] if end and "T" in end else ""
                 if name:
                     calendar_events.append({"name": name, "start": start_time, "end": end_time})
     except Exception as e:
         print(f"[WARN] Calendar fetch error: {e}")
 
-# カレンダーHTML
 calendar_html = ""
 if calendar_events:
     rows = []
@@ -453,7 +699,7 @@ if calendar_events:
                 sh, sm = int(ev["start"][:2]), int(ev["start"][3:])
                 eh, em = int(ev["end"][:2]),   int(ev["end"][3:])
                 mins = (eh * 60 + em) - (sh * 60 + sm)
-                duration = f"{mins}\u5206" if mins > 0 else ""
+                duration = f"{mins}分" if mins > 0 else ""
             except:
                 pass
         rows.append(
@@ -477,7 +723,6 @@ if calendar_events:
 GH_PAT   = os.environ.get("GH_PAT", "")
 GH_REPO  = "Fredemantha0109/spring-ark-system"
 
-# ── 高負荷モード判定 ──────────────────────────────
 def calc_load_mode(events):
     total_mins = 0
     for ev in events:
@@ -490,16 +735,15 @@ def calc_load_mode(events):
                 pass
     count = len(events)
     if count >= 3 or total_mins >= 120:
-        return "\U0001f534 \u591a\u5fd9\u65e5", "red",   "\u7fd2\u6163\u306f\u6700\u5c0f\u9650\u3067"
+        return "🔴 多忙日", "red",   "習慣は最小限で"
     elif count >= 1 or total_mins >= 60:
-        return "\U0001f7e1 \u901a\u5e38\u65e5", "amber", "\u3044\u3064\u3082\u901a\u308a\u3067"
+        return "🟡 通常日", "amber", "いつも通りで"
     else:
-        return "\U0001f7e2 \u4f59\u88d5\u65e5", "green", "\u7fd2\u6163\u3092\u7a4d\u307f\u4e0a\u3052\u308b\u30c1\u30e3\u30f3\u30b9"
+        return "🟢 余裕日", "green", "習慣を積み上げるチャンス"
 
 load_label, load_color, load_sub = calc_load_mode(calendar_events)
 
 def fetch_load_for_date(date_str):
-    """指定日のカレンダー予定を取得してload判定を返す"""
     if not CALENDAR_DATABASE_ID:
         return "通常日"
     try:
@@ -528,18 +772,15 @@ def fetch_load_for_date(date_str):
         return "通常日"
 
 def majority_load(date_list, suffix):
-    """日付リストのload判定多数決でバッジHTMLを返す"""
     counts = {}
     for d in date_list:
         lbl = fetch_load_for_date(d)
-        # 絵文字+テキスト例: "🟡 通常日" → "通常"部分だけ取得
         key = lbl.split(" ")[-1].replace("日", "")
         counts[key] = counts.get(key, 0) + 1
     if not counts:
         top_key = "通常"
     else:
         top_key = sorted(counts.items(), key=lambda x: -x[1])[0][0]
-    # 色マップ
     color_map = {"多忙": ("red", "🔴"), "通常": ("amber", "🟡"), "余裕": ("green", "🟢")}
     color, emoji = color_map.get(top_key, ("amber", "🟡"))
     badge_color_map = {
@@ -555,6 +796,7 @@ def majority_load(date_list, suffix):
         f'<span class="text-[11px] font-bold {tc}">{label}</span>'
         f'</div>'
     )
+
 load_color_map = {
     "red":   ("text-red-400",   "bg-red-500/10 border-red-500/30"),
     "amber": ("text-amber-300", "bg-amber-500/10 border-amber-500/30"),
@@ -606,7 +848,6 @@ if judge_label == "危険":
         f'</script>'
     )
 
-# ── 優先タスク候補パネルHTML ──────────────────────────
 def make_candidate_card(rank, task_name, category, reason, gh_pat, gh_repo):
     cat_colors = {
         "W":  ("text-green-400",  "bg-green-500/10 border-green-500/25",  "WELLNESS"),
@@ -627,31 +868,31 @@ def make_candidate_card(rank, task_name, category, reason, gh_pat, gh_repo):
         f'<p class="text-[9px] text-ark-muted mt-0.5">{reason}</p>'
         f'</div>'
         f'<button onclick="{fn}()" class="flex-shrink-0 bg-violet-500/15 hover:bg-violet-500/30 border border-violet-500/30 text-violet-300 text-[10px] font-black rounded-lg px-3 py-1.5 transition-all cursor-pointer">'
-        f'\u26a1 \u512a\u5148\u8a2d\u5b9a</button>'
+        f'⚡ 優先設定</button>'
         f'</div></div>'
         f'<script>'
         f'async function {fn}(){{'
-        f'  const btn=event.target;btn.textContent="\u9001\u4fe1\u4e2d...";btn.disabled=true;'
+        f'  const btn=event.target;btn.textContent="送信中...";btn.disabled=true;'
         f'  try{{'
         f'    const r=await fetch("https://api.github.com/repos/{gh_repo}/dispatches",{{'
         f'      method:"POST",'
         f'      headers:{{"Authorization":"Bearer {gh_pat}","Accept":"application/vnd.github+json","Content-Type":"application/json"}},'
         f'      body:JSON.stringify({{"event_type":"force_priority","client_payload":{{"task_name":"{task_name}","category":"{category}"}}}}),'
         f'    }});'
-        f'    if(r.status===204){{btn.textContent="\u2705 \u8ffd\u52a0\u5b8c\u4e86";btn.style.borderColor="#22c55e";btn.style.color="#4ade80";}}'
-        f'    else{{btn.textContent="\u274c \u30a8\u30e9\u30fc";btn.disabled=false;}}'
-        f'  }}catch(e){{btn.textContent="\u274c \u30a8\u30e9\u30fc";btn.disabled=false;}}'
+        f'    if(r.status===204){{btn.textContent="✅ 追加完了";btn.style.borderColor="#22c55e";btn.style.color="#4ade80";}}'
+        f'    else{{btn.textContent="❌ エラー";btn.disabled=false;}}'
+        f'  }}catch(e){{btn.textContent="❌ エラー";btn.disabled=false;}}'
         f'}}</script>'
     )
 
 priority_candidates_html = ""
 cards = []
 if candidate_1:
-    reason1 = f"\u904e\u53bb5\u65e5\u9593\u3067{candidate_1[2]}\u56de\u672a\u9054"
+    reason1 = f"過去5日間で{candidate_1[2]}回未達"
     cards.append(make_candidate_card(1, candidate_1[0], candidate_1[1], reason1, GH_PAT, GH_REPO))
 if candidate_2:
-    last = candidate_2[2] if candidate_2[2] != "never" else "\u671f\u9593\u5185\u672a\u5b8c\u4e86"
-    reason2 = f"\u6700\u7d42\u5b8c\u4e86\u65e5: {last}"
+    last = candidate_2[2] if candidate_2[2] != "never" else "期間内未完了"
+    reason2 = f"最終完了日: {last}"
     cards.append(make_candidate_card(2, candidate_2[0], candidate_2[1], reason2, GH_PAT, GH_REPO))
 
 if cards:
@@ -666,7 +907,6 @@ if cards:
         '</div></div>'
     )
 
-# 判定カラー設定
 judge_colors = {
     "green": ("text-green-400", "border-green-500/25"),
     "amber": ("text-amber-300", "border-amber-500/25"),
@@ -676,27 +916,23 @@ judge_text_c, judge_border = judge_colors[judge_color]
 cond_text_c = {"好調": "text-green-400", "普通": "text-amber-400", "不調": "text-red-400"}.get(condition, "text-amber-400")
 sleep_c = "text-amber-300" if isinstance(sleep, float) and sleep < 7 else "text-white"
 
-# インジケータードット設定
-good_dot_size     = "w-8 h-8" if judge_label == "\u826f\u597d"   else "w-5 h-5"
-caution_dot_size  = "w-8 h-8" if judge_label == "\u8981\u6ce8\u610f" else "w-5 h-5"
-alert_dot_size    = "w-8 h-8" if judge_label == "\u5371\u967a"   else "w-5 h-5"
-good_dot_style    = "bg-green-400 shadow-[0_0_14px_rgba(34,197,94,.75)]"    if judge_label == "\u826f\u597d"   else "bg-green-500/15 border border-green-500/20"
-caution_dot_style = "bg-amber-400 shadow-[0_0_14px_rgba(251,191,36,.75)]"   if judge_label == "\u8981\u6ce8\u610f" else "bg-amber-500/15 border border-amber-500/20"
-alert_dot_style   = "bg-red-400 shadow-[0_0_14px_rgba(239,68,68,.75)]"      if judge_label == "\u5371\u967a"   else "bg-red-500/15 border border-red-500/20"
-good_text_style    = "text-green-400 font-black"  if judge_label == "\u826f\u597d"   else "text-green-500/40 font-bold"
-caution_text_style = "text-amber-400 font-black"  if judge_label == "\u8981\u6ce8\u610f" else "text-amber-500/40 font-bold"
-alert_text_style   = "text-red-400 font-black"    if judge_label == "\u5371\u967a"   else "text-red-500/40 font-bold"
+good_dot_size     = "w-8 h-8" if judge_label == "良好"   else "w-5 h-5"
+caution_dot_size  = "w-8 h-8" if judge_label == "要注意" else "w-5 h-5"
+alert_dot_size    = "w-8 h-8" if judge_label == "危険"   else "w-5 h-5"
+good_dot_style    = "bg-green-400 shadow-[0_0_14px_rgba(34,197,94,.75)]"    if judge_label == "良好"   else "bg-green-500/15 border border-green-500/20"
+caution_dot_style = "bg-amber-400 shadow-[0_0_14px_rgba(251,191,36,.75)]"   if judge_label == "要注意" else "bg-amber-500/15 border border-amber-500/20"
+alert_dot_style   = "bg-red-400 shadow-[0_0_14px_rgba(239,68,68,.75)]"      if judge_label == "危険"   else "bg-red-500/15 border border-red-500/20"
+good_text_style    = "text-green-400 font-black"  if judge_label == "良好"   else "text-green-500/40 font-bold"
+caution_text_style = "text-amber-400 font-black"  if judge_label == "要注意" else "text-amber-500/40 font-bold"
+alert_text_style   = "text-red-400 font-black"    if judge_label == "危険"   else "text-red-500/40 font-bold"
 
 generated_at = datetime.now(sgt).strftime("%H:%M")
 
-# ── Week番号・Q表示 ───────────────────────────────
-# Spring Ark Week1開始日: 2026-04-06（月）
 PROJECT_START = datetime(2026, 4, 6, tzinfo=sgt)
 target_date   = datetime.strptime(yesterday, "%Y-%m-%d").replace(tzinfo=sgt)
 delta_days    = (target_date - PROJECT_START).days
 week_num      = max(1, delta_days // 7 + 1)
 
-# 四半期
 month = target_date.month
 if month <= 3:
     quarter, q_start_month = 1, 1
@@ -709,8 +945,7 @@ else:
 q_start = datetime(target_date.year, q_start_month, 1, tzinfo=sgt)
 q_day   = (target_date - q_start).days + 1
 
-# 日付表示フォーマット（例: 2026-04-21 · Week 3 · Q2-Day 16）
-header_date = f"{yesterday}\u00a0\u00b7\u00a0Week\u00a0{week_num}\u00a0\u00b7\u00a0Q{quarter}-Day\u00a0{q_day}"
+header_date = f"{yesterday}\u00a0·\u00a0Week\u00a0{week_num}\u00a0·\u00a0Q{quarter}-Day\u00a0{q_day}"
 
 
 # ── Weekly集計（先週月〜日）────────────────────────
@@ -739,7 +974,6 @@ w_score_ca = w_avg("【Ca】スコア")
 w_score_i  = w_avg("【I】スコア")
 w_score_total = round((w_score_w + w_score_c + w_score_ca + w_score_i) / 4)
 
-# 体重・睡眠・体調の週平均
 w_weights = [p.get("体重", {}).get("number") for _, p in weekly_pages if p.get("体重", {}).get("number")]
 w_sleeps  = [p.get("睡眠時間", {}).get("number") for _, p in weekly_pages if p.get("睡眠時間", {}).get("number")]
 w_conds   = [p.get("体調", {}).get("select", {}) for _, p in weekly_pages]
@@ -756,8 +990,7 @@ if cond_counts:
 else:
     w_cond_summary = "-"
 
-# タスク実施回数集計
-task_done_count = {}  # {(task_name, category): count}
+task_done_count = {}
 cat_map = {
     "W":  ("【W】実績",  "Wellness"),
     "C":  ("【C】実績",  "Communication"),
@@ -766,14 +999,13 @@ cat_map = {
 }
 import re as _re
 TASK_ALIASES = {
-    "\u30e9\u30a4\u30a2\u30f3": "\u52d5\u753b\u8996\u8074",
-    "Soccer":    "\u52d5\u753b\u8996\u8074",
-    "Scrambled": "\u52d5\u753b\u8996\u8074",
-    "Youtube":   "\u52d5\u753b\u8996\u8074",
+    "ライアン": "動画視聴",
+    "Soccer":    "動画視聴",
+    "Scrambled": "動画視聴",
+    "Youtube":   "動画視聴",
 }
 def normalize_task(name):
-    """括弧内（曜日・定着など）を除いてタスク名を正規化、エイリアスを統合"""
-    base = _re.sub(r"\uff08[^\uff09]*\uff09", "", name).strip()
+    base = _re.sub(r"（[^）]*）", "", name).strip()
     return TASK_ALIASES.get(base, base)
 
 for _, p in weekly_pages:
@@ -784,7 +1016,6 @@ for _, p in weekly_pages:
             k = (normalized, cat_key)
             task_done_count[k] = task_done_count.get(k, 0) + 1
 
-# カテゴリ別にソート（回数多い順）
 weekly_task_rows = {}
 for cat_key in ["W", "C", "Ca", "I"]:
     rows = [(t, c) for (t, c), cnt in sorted(task_done_count.items(), key=lambda x: -x[1]) if c == cat_key]
@@ -833,7 +1064,6 @@ if m_cond_counts:
 else:
     m_cond_summary = "-"
 
-# 月次タスク実施回数集計
 m_task_done_count = {}
 for _, p in monthly_pages:
     for cat_key, (done_key, cat_name) in cat_map.items():
@@ -848,7 +1078,6 @@ for cat_key in ["W", "C", "Ca", "I"]:
     rows = [(t, c) for (t, c), cnt in sorted(m_task_done_count.items(), key=lambda x: -x[1]) if c == cat_key]
     monthly_task_rows[cat_key] = rows
 
-# Monthly判定
 if m_score_total >= 80:
     m_judge_label, m_judge_color = "🏅絶好調", "green"
 elif m_score_total >= 50:
@@ -863,17 +1092,158 @@ m_judge_colors = {
 }
 m_judge_text_c, m_judge_border = m_judge_colors[m_judge_color]
 
-# Weekly/Monthly バッジHTML（カレンダー多数決）
 w_badge_html = majority_load([d for d, _ in weekly_pages], "週")
 m_badge_html = majority_load([d for d, _ in monthly_pages], "月")
 
-# Monthly AIコメント生成
-def generate_monthly_comment(m_score_w, m_score_c, m_score_ca, m_score_i, m_score_total,
-                               m_weight_avg, m_sleep_avg, m_cond_summary, m_task_done_count):
+
+# ── ▼ ジャーナリングデータ取得（Weekly・Monthly）─────
+w_journal_entries = fetch_journal_entries(
+    _last_monday.strftime("%Y-%m-%d"),
+    _last_sunday.strftime("%Y-%m-%d"),
+)
+# Weekly JournalDB（その週の1件）
+w_journal_weekly_entries = fetch_weekly_journal_entries(
+    _last_monday.strftime("%Y-%m-%d"),
+    _last_sunday.strftime("%Y-%m-%d"),
+)
+
+m_journal_entries = fetch_journal_entries(
+    _last_month_start.strftime("%Y-%m-%d"),
+    _last_month_end.strftime("%Y-%m-%d"),
+)
+# Monthly分析用：Weekly Journalの4〜5週分を取得
+m_journal_weekly_entries = fetch_weekly_journal_entries(
+    _last_month_start.strftime("%Y-%m-%d"),
+    _last_month_end.strftime("%Y-%m-%d"),
+)
+# Monthly JournalDB（運用開始後に有効化）
+m_journal_monthly_entries = fetch_monthly_journal_entries(
+    _last_month_start.strftime("%Y-%m-%d"),
+    _last_month_end.strftime("%Y-%m-%d"),
+)
+# ── ▲ ジャーナリングデータ取得ここまで ─────────────
+
+
+# ── ▼ generate_weekly_comment（ジャーナリング統合版）──
+def generate_weekly_comment(
+    w_score_w, w_score_c, w_score_ca, w_score_i, w_score_total,
+    w_weight_avg, w_sleep_avg, w_cond_summary, task_done_count,
+    journal_entries=None,
+    journal_weekly_entries=None,   # ← 追加：Weekly Journalまとめ
+):
     if not ANTHROPIC_API_KEY:
         return [], ""
+
+    top_tasks = sorted(task_done_count.items(), key=lambda x: -x[1])[:10]
+    done_str = "\n".join([f"・{t}({c}): {cnt}回" for (t, c), cnt in top_tasks]) or "なし"
+
+    missed_tasks_w = []
+    for _, p in weekly_pages:
+        for cat_key, (done_key, cat_name) in cat_map.items():
+            plan_key = f"【{cat_key}】予定タスク"
+            plan = [t["name"].lstrip("🔥") for t in p.get(plan_key, {}).get("multi_select", [])]
+            done = [t["name"].lstrip("🔥") for t in p.get(done_key, {}).get("multi_select", [])]
+            for task in plan:
+                if task not in done:
+                    missed_tasks_w.append(f"{cat_name}: {task}")
+    missed_str = "\n".join(list(dict.fromkeys(missed_tasks_w))[:8]) or "なし"
+
+    # Daily生データ（詳細な感情・ニーズ）
+    journal_section = build_journal_prompt_section(journal_entries or [])
+    # Weekly Journalまとめ（Claudeが既に構造化済みの高品質データ）
+    weekly_journal_section = build_weekly_journal_section(journal_weekly_entries or [])
+
+    has_journal = bool(journal_section or weekly_journal_section)
+    journal_instruction = (
+        "\nジャーナリングデータも踏まえ、以下を分析に含めてください:\n"
+        "・今週繰り返し現れた放電源・充電源のパターン\n"
+        "・最も強く出ていたNVCのニーズ（安心・つながり・自律・承認 等）\n"
+        "・感情と行動習慣（タスク達成）の相関\n"
+    ) if has_journal else ""
+
+    analysis_instruction = (
+        "体重・睡眠・体調・完了タスク・未達タスク"
+        + ("・ジャーナリング（感情パターン・ニーズ・放電充電）" if has_journal else "")
+        + "を総合的に踏まえた今週の総合評価・考察・改善提案を200字程度で記載。来週への具体的アクションも含めること。"
+    )
+
+    prompt = (
+        "あなたはSpring Arkプロジェクトのパーソナルコーチです。\n"
+        "以下の週次データをもとに、分析レポートをJSON形式で出力してください。\n\n"
+        f"【今週のコンディション】\n"
+        f"- 体重平均: {w_weight_avg}kg\n"
+        f"- 睡眠平均: {w_sleep_avg}h\n"
+        f"- 体調: {w_cond_summary}\n"
+        f"- 週平均スコア: W:{w_score_w} / C:{w_score_c} / Ca:{w_score_ca} / I:{w_score_i} / 総合:{w_score_total}\n\n"
+        f"【実施できた主なタスク】\n{done_str}\n\n"
+        f"【未達が多かったタスク】\n{missed_str}\n"
+        + weekly_journal_section   # Weekly Journalまとめを先に（構造化済みで高品質）
+        + journal_section          # Daily生データを後に（詳細補足として）
+        + journal_instruction
+        + "\n【出力形式】必ずJSONオブジェクトのみ出力してください。他のテキストは一切不要。\n"
+        "{\n"
+        '  "summaries": [\n'
+        '    {"title": "要点タイトル（15文字以内）", "detail": "具体的分析（40文字以内）"},\n'
+        '    {"title": "要点タイトル（15文字以内）", "detail": "具体的分析（40文字以内）"},\n'
+        '    {"title": "要点タイトル（15文字以内）", "detail": "具体的分析（40文字以内）"}\n'
+        "  ],\n"
+        f'  "analysis": "{analysis_instruction}"\n'
+        "}"
+    )
+
+    import json as _j
+    try:
+        res = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1200, "messages": [{"role": "user", "content": prompt}]},
+            timeout=30,
+        )
+        text = res.json()["content"][0]["text"].strip()
+        start_j, end_j = text.find("{"), text.rfind("}") + 1
+        if start_j >= 0 and end_j > start_j:
+            parsed = _j.loads(text[start_j:end_j])
+            return validate_weekly_monthly(parsed)
+    except Exception as e:
+        print(f"[WARN] Weekly Claude API error: {e}")
+    return validate_weekly_monthly({})
+# ── ▲ generate_weekly_comment ここまで ──────────────
+
+
+# ── ▼ generate_monthly_comment（ジャーナリング統合版）─
+def generate_monthly_comment(
+    m_score_w, m_score_c, m_score_ca, m_score_i, m_score_total,
+    m_weight_avg, m_sleep_avg, m_cond_summary, m_task_done_count,
+    journal_entries=None,
+    journal_weekly_entries=None,    # ← 追加：月内4〜5週のWeekly Journal
+    journal_monthly_entries=None,   # ← 追加：Monthly Journal（運用開始後）
+):
+    if not ANTHROPIC_API_KEY:
+        return [], ""
+
     top_tasks = sorted(m_task_done_count.items(), key=lambda x: -x[1])[:12]
     done_str = "\n".join([f"・{t}({c}): {cnt}回" for (t, c), cnt in top_tasks]) or "なし"
+
+    # 優先度順：Monthly Journal > Weekly Journalまとめ > Daily生データ
+    monthly_journal_section = build_monthly_journal_section(journal_monthly_entries or [])
+    weekly_journal_section  = build_weekly_journal_section(journal_weekly_entries or [])
+    daily_journal_section   = build_journal_monthly_section(journal_entries or [])
+
+    has_journal = bool(monthly_journal_section or weekly_journal_section or daily_journal_section)
+    journal_instruction = (
+        "\nジャーナリングデータも踏まえ、以下を月次分析に含めてください:\n"
+        "・月を通じて繰り返された放電パターンと根本ニーズ\n"
+        "・最も頻出したNVCのニーズとその充足度の変化\n"
+        "・習慣（タスク達成）と感情エネルギーの相関\n"
+        "・来月に向けた具体的な一つの実験提案\n"
+    ) if has_journal else ""
+
+    analysis_instruction = (
+        "体重・睡眠・体調・完了タスク"
+        + ("・ジャーナリング（感情パターン・ニーズの変化・放電充電の傾向）" if has_journal else "")
+        + "を総合的に踏まえた今月の総合評価・考察・改善提案を200字程度で記載。来月への具体的な一つの実験も含めること。"
+    )
+
     prompt = (
         "あなたはSpring Arkプロジェクトのパーソナルコーチです。\n"
         "以下の月次データをもとに、月次分析レポートをJSON形式で出力してください。\n\n"
@@ -882,24 +1252,29 @@ def generate_monthly_comment(m_score_w, m_score_c, m_score_ca, m_score_i, m_scor
         f"- 睡眠平均: {m_sleep_avg}h\n"
         f"- 体調: {m_cond_summary}\n"
         f"- 月平均スコア: W:{m_score_w} / C:{m_score_c} / Ca:{m_score_ca} / I:{m_score_i} / 総合:{m_score_total}\n\n"
-        f"【実施できた主なタスク（上位）】\n{done_str}\n\n"
-        "【出力形式】必ずJSONオブジェクトのみ出力してください。他のテキストは一切不要。\n"
+        f"【実施できた主なタスク（上位）】\n{done_str}\n"
+        + monthly_journal_section   # 最高品質：Monthly Journalまとめ（運用後）
+        + weekly_journal_section    # 高品質：Weekly Journalまとめ×4〜5週
+        + daily_journal_section     # 補足：Daily生データ（週単位圧縮）
+        + journal_instruction
+        + "\n【出力形式】必ずJSONオブジェクトのみ出力してください。他のテキストは一切不要。\n"
         "{\n"
         '  "summaries": [\n'
         '    {"title": "要点タイトル（15文字以内）", "detail": "具体的分析（40文字以内）"},\n'
         '    {"title": "要点タイトル（15文字以内）", "detail": "具体的分析（40文字以内）"},\n'
         '    {"title": "要点タイトル（15文字以内）", "detail": "具体的分析（40文字以内）"}\n'
         "  ],\n"
-        '  "analysis": "体重・睡眠・体調・完了タスク・未達タスクを総合的に踏まえた今月の総合評価・考察・改善提案を200字程度で記載。来月への具体的アクションも含めること。"\n'
+        f'  "analysis": "{analysis_instruction}"\n'
         "}"
     )
+
     import json as _j
     try:
         res = requests.post(
             "https://api.anthropic.com/v1/messages",
             headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
             json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1200, "messages": [{"role": "user", "content": prompt}]},
-            timeout=30
+            timeout=30,
         )
         text = res.json()["content"][0]["text"].strip()
         start_j, end_j = text.find("{"), text.rfind("}") + 1
@@ -909,13 +1284,18 @@ def generate_monthly_comment(m_score_w, m_score_c, m_score_ca, m_score_i, m_scor
     except Exception as e:
         print(f"[WARN] Monthly Claude API error: {e}")
     return validate_weekly_monthly({})
+# ── ▲ generate_monthly_comment ここまで ─────────────
 
+
+# ── Weekly/Monthly AIコメント生成（journal_entries を渡す）
 monthly_summaries, monthly_analysis = generate_monthly_comment(
     m_score_w, m_score_c, m_score_ca, m_score_i, m_score_total,
-    m_weight_avg, m_sleep_avg, m_cond_summary, m_task_done_count
+    m_weight_avg, m_sleep_avg, m_cond_summary, m_task_done_count,
+    journal_entries=m_journal_entries,
+    journal_weekly_entries=m_journal_weekly_entries,     # ← 追加
+    journal_monthly_entries=m_journal_monthly_entries,  # ← 追加
 )
 
-# Monthly右側コメントHTML
 monthly_comment_html = ""
 if monthly_summaries or monthly_analysis:
     m_items = []
@@ -945,13 +1325,12 @@ if monthly_summaries or monthly_analysis:
 else:
     monthly_comment_html = '<p class="text-xs text-ark-muted text-center py-4">月次分析データがありません</p>'
 
-# Weekly判定
 if w_score_total >= 80:
-    w_judge_label, w_judge_color = "\U0001f3fb\u7d76\u597d\u8abf", "green"
+    w_judge_label, w_judge_color = "🏻絶好調", "green"
 elif w_score_total >= 50:
-    w_judge_label, w_judge_color = "\U0001f4c8\u6210\u9577\u4e2d", "amber"
+    w_judge_label, w_judge_color = "📈成長中", "amber"
 else:
-    w_judge_label, w_judge_color = "\U0001f527\u8981\u6539\u5584", "red"
+    w_judge_label, w_judge_color = "🔧要改善", "red"
 
 w_judge_colors = {
     "green": ("text-green-400", "border-green-500/25"),
@@ -960,66 +1339,13 @@ w_judge_colors = {
 }
 w_judge_text_c, w_judge_border = w_judge_colors[w_judge_color]
 
-# Weekly AIコメント生成
-def generate_weekly_comment(w_score_w, w_score_c, w_score_ca, w_score_i, w_score_total,
-                              w_weight_avg, w_sleep_avg, w_cond_summary, task_done_count):
-    if not ANTHROPIC_API_KEY:
-        return [], ""
-    top_tasks = sorted(task_done_count.items(), key=lambda x: -x[1])[:10]
-    done_str = "\n".join([f"\u30fb{t}({c}): {cnt}\u56de" for (t, c), cnt in top_tasks]) or "\u306a\u3057"
-    missed_tasks_w = []
-    for _, p in weekly_pages:
-        for cat_key, (done_key, cat_name) in cat_map.items():
-            plan_key = f"\u3010{cat_key}\u3011\u4e88\u5b9a\u30bf\u30b9\u30af"
-            plan = [t["name"].lstrip("\U0001f525") for t in p.get(plan_key, {}).get("multi_select", [])]
-            done = [t["name"].lstrip("\U0001f525") for t in p.get(done_key, {}).get("multi_select", [])]
-            for task in plan:
-                if task not in done:
-                    missed_tasks_w.append(f"{cat_name}: {task}")
-    missed_str = "\n".join(list(dict.fromkeys(missed_tasks_w))[:8]) or "\u306a\u3057"
-    prompt = (
-        "\u3042\u306a\u305f\u306fSpring Ark\u30d7\u30ed\u30b8\u30a7\u30af\u30c8\u306e\u30d1\u30fc\u30bd\u30ca\u30eb\u30b3\u30fc\u30c1\u3067\u3059\u3002\n"
-        "\u4ee5\u4e0b\u306e\u9031\u6b21\u30c7\u30fc\u30bf\u3092\u3082\u3068\u306b\u3001\u5206\u6790\u30ec\u30dd\u30fc\u30c8\u3092JSON\u5f62\u5f0f\u3067\u51fa\u529b\u3057\u3066\u304f\u3060\u3055\u3044\u3002\n\n"
-        f"\u3010\u4eca\u9031\u306e\u30b3\u30f3\u30c7\u30a3\u30b7\u30e7\u30f3\u3011\n"
-        f"- \u4f53\u91cd\u5e73\u5747: {w_weight_avg}kg\n"
-        f"- \u7751\u7720\u5e73\u5747: {w_sleep_avg}h\n"
-        f"- \u4f53\u8abf: {w_cond_summary}\n"
-        f"- \u9031\u5e73\u5747\u30b9\u30b3\u30a2: W:{w_score_w} / C:{w_score_c} / Ca:{w_score_ca} / I:{w_score_i} / \u7dcf\u5408:{w_score_total}\n\n"
-        f"\u3010\u5b9f\u65bd\u3067\u304d\u305f\u4e3b\u306a\u30bf\u30b9\u30af\u3011\n{done_str}\n\n"
-        f"\u3010\u672a\u9054\u304c\u591a\u304b\u3063\u305f\u30bf\u30b9\u30af\u3011\n{missed_str}\n\n"
-        "\u3010\u51fa\u529b\u5f62\u5f0f\u3011\u5fc5\u305aJSON\u30aa\u30d6\u30b8\u30a7\u30af\u30c8\u306e\u307f\u51fa\u529b\u3057\u3066\u304f\u3060\u3055\u3044\u3002\u4ed6\u306e\u30c6\u30ad\u30b9\u30c8\u306f\u4e00\u5207\u4e0d\u8981\u3002\n"
-        "{\n"
-        '  "summaries": [\n'
-        '    {"title": "\u8981\u70b9\u30bf\u30a4\u30c8\u30eb\uff0815\u6587\u5b57\u4ee5\u5185\uff09", "detail": "\u5177\u4f53\u7684\u5206\u6790\uff0840\u6587\u5b57\u4ee5\u5185\uff09"},\n'
-        '    {"title": "\u8981\u70b9\u30bf\u30a4\u30c8\u30eb\uff0815\u6587\u5b57\u4ee5\u5185\uff09", "detail": "\u5177\u4f53\u7684\u5206\u6790\uff0840\u6587\u5b57\u4ee5\u5185\uff09"},\n'
-        '    {"title": "\u8981\u70b9\u30bf\u30a4\u30c8\u30eb\uff0815\u6587\u5b57\u4ee5\u5185\uff09", "detail": "\u5177\u4f53\u7684\u5206\u6790\uff0840\u6587\u5b57\u4ee5\u5185\uff09"}\n'
-        "  ],\n"
-        '  "analysis": "\u4f53\u91cd\u30fb\u7751\u7720\u30fb\u4f53\u8abf\u30fb\u5b8c\u4e86\u30bf\u30b9\u30af\u30fb\u672a\u9054\u30bf\u30b9\u30af\u3092\u7d5c\u5408\u7684\u306b\u8e0f\u307e\u3048\u305f\u4eca\u9031\u306e\u7dcf\u5408\u8a55\u4fa1\u30fb\u8003\u5bdf\u30fb\u6539\u5584\u63d0\u6848\u3092200\u5b57\u7a0b\u5ea6\u3067\u8a18\u8f09\u3002\u6b21\u9031\u3078\u306e\u5177\u4f53\u7684\u30a2\u30af\u30b7\u30e7\u30f3\u3082\u542b\u3081\u308b\u3053\u3068\u3002"\n'
-        "}"
-    )
-    import json as _j
-    try:
-        res = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1200, "messages": [{"role": "user", "content": prompt}]},
-            timeout=30
-        )
-        text = res.json()["content"][0]["text"].strip()
-        start_j, end_j = text.find("{"), text.rfind("}") + 1
-        if start_j >= 0 and end_j > start_j:
-            parsed = _j.loads(text[start_j:end_j])
-            return validate_weekly_monthly(parsed)
-    except Exception as e:
-        print(f"[WARN] Weekly Claude API error: {e}")
-    return validate_weekly_monthly({})
-
 weekly_summaries, weekly_analysis = generate_weekly_comment(
     w_score_w, w_score_c, w_score_ca, w_score_i, w_score_total,
-    w_weight_avg, w_sleep_avg, w_cond_summary, task_done_count
+    w_weight_avg, w_sleep_avg, w_cond_summary, task_done_count,
+    journal_entries=w_journal_entries,
+    journal_weekly_entries=w_journal_weekly_entries,   # ← 追加
 )
 
-# Weekly右側コメントHTML
 weekly_comment_html = ""
 if weekly_summaries or weekly_analysis:
     items = []
@@ -1049,7 +1375,6 @@ if weekly_summaries or weekly_analysis:
 else:
     weekly_comment_html = '<p class="text-xs text-ark-muted text-center py-4">週次分析データがありません</p>'
 
-# Weeklyカテゴリカード
 def weekly_task_card(name, subtitle, icon_svg, color, score, task_rows_list):
     color_map = {
         "green": ("text-green-400", "bg-green-500/10 border-green-500/20", "border-ark-border",   "from-green-600 to-emerald-400"),
@@ -1096,12 +1421,11 @@ def weekly_task_card(name, subtitle, icon_svg, color, score, task_rows_list):
 
 weekly_cards_html = (
     weekly_task_card("WELLNESS",      "運動・食事・精神",  ICON_W,  "green", w_score_w,  weekly_task_rows["W"],  ) +
-    weekly_task_card("COMMUNICATION", "英語学習・実践",        ICON_C,  "amber", w_score_c,  weekly_task_rows["C"],  ) +
-    weekly_task_card("CAREER",        "AI・ビジネス・CPA",         ICON_CA, "rose",  w_score_ca, weekly_task_rows["Ca"], ) +
-    weekly_task_card("INPUT",         "読書・NewsPicks",                        ICON_I,  "sky",   w_score_i,  weekly_task_rows["I"],  )
+    weekly_task_card("COMMUNICATION", "英語学習・実践",    ICON_C,  "amber", w_score_c,  weekly_task_rows["C"],  ) +
+    weekly_task_card("CAREER",        "AI・ビジネス・CPA", ICON_CA, "rose",  w_score_ca, weekly_task_rows["Ca"], ) +
+    weekly_task_card("INPUT",         "読書・NewsPicks",   ICON_I,  "sky",   w_score_i,  weekly_task_rows["I"],  )
 )
 
-# Monthlyカテゴリカード
 monthly_cards_html = (
     weekly_task_card("WELLNESS",      "運動・食事・精神",  ICON_W,  "green", m_score_w,  monthly_task_rows["W"],  ) +
     weekly_task_card("COMMUNICATION", "英語学習・実践",    ICON_C,  "amber", m_score_c,  monthly_task_rows["C"],  ) +
@@ -1116,14 +1440,14 @@ cards_html = (
     category_card("INPUT",         "読書・NewsPicks",   ICON_I,  "sky",   score_i,  plan_i,  done_i)
 )
 
-# ── HTML組み立て（文字列結合、三重クォートf-string不使用）──
+# ── HTML組み立て ──────────────────────────────────
 html = (
     "<!DOCTYPE html>\n"
     '<html lang="ja">\n'
     "<head>\n"
     '  <meta charset="UTF-8">\n'
     '  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
-    "  <title>SPRING ARK \u2014 Daily Dashboard</title>\n"
+    "  <title>SPRING ARK — Daily Dashboard</title>\n"
     '  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900'
     '&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">\n'
     '  <script src="https://cdn.tailwindcss.com"></script>\n'
@@ -1169,12 +1493,11 @@ html = (
     '<body class="min-h-screen text-white antialiased">\n'
     '<div class="max-w-5xl mx-auto px-4 py-6 flex flex-col gap-5">\n'
 
-    # ヘッダー
     "\n  <header class=\"flex items-start justify-between\">\n"
     "    <div>\n"
     "      <div class=\"flex items-baseline gap-2.5 mb-1\">\n"
     "        <h1 class=\"text-2xl font-black tracking-tight\">SPRING ARK</h1>\n"
-    "<div class=\"inline-flex bg-ark-dim rounded-full p-0.5 gap-0.5\"><button id=\"tab-daily\" onclick=\"switchTab(\'daily\')\" class=\"tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border\">Daily</button><button id=\"tab-weekly\" onclick=\"switchTab(\'weekly\')\" class=\"tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted\">Weekly</button><button id=\"tab-monthly\" onclick=\"switchTab(\'monthly\')\" class=\"tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted\">Monthly</button></div>\n"
+    "<div class=\"inline-flex bg-ark-dim rounded-full p-0.5 gap-0.5\"><button id=\"tab-daily\" onclick=\"switchTab('daily')\" class=\"tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border\">Daily</button><button id=\"tab-weekly\" onclick=\"switchTab('weekly')\" class=\"tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted\">Weekly</button><button id=\"tab-monthly\" onclick=\"switchTab('monthly')\" class=\"tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted\">Monthly</button></div>\n"
     "      </div>\n"
     f"      <p class=\"text-xs text-ark-muted\">{header_date}</p>\n"
     "    </div>\n"
@@ -1183,10 +1506,8 @@ html = (
     + '<div id="badge-monthly" style="display:none">' + m_badge_html + '</div>'
     + "  </header>\n"
 
-    # Daily view wrapper
-    '<div id="daily-view">'
+    + '<div id="daily-view">'
 
-    # コンディションセクション
     "\n  <section>\n"
     "    <span class=\"text-[10px] font-bold text-ark-muted tracking-[.2em] uppercase block mb-2\">Today's Condition</span>\n"
     f"    <div class=\"bg-ark-card border {judge_border} rounded-2xl p-5 glow-amber\">\n"
@@ -1195,21 +1516,20 @@ html = (
     "          <div class=\"flex items-end gap-2.5\">\n"
     "            <div class=\"flex flex-col items-center gap-1.5\">\n"
     f"              <div class=\"{good_dot_size} rounded-full {good_dot_style}\"></div>\n"
-    f"              <span class=\"text-[8px] {good_text_style}\">\u826f\u597d</span>\n"
+    f"              <span class=\"text-[8px] {good_text_style}\">良好</span>\n"
     "            </div>\n"
     "            <div class=\"flex flex-col items-center gap-1.5\">\n"
     f"              <div class=\"{caution_dot_size} rounded-full {caution_dot_style}\"></div>\n"
-    f"              <span class=\"text-[8px] {caution_text_style}\">\u8981\u6ce8\u610f</span>\n"
+    f"              <span class=\"text-[8px] {caution_text_style}\">要注意</span>\n"
     "            </div>\n"
     "            <div class=\"flex flex-col items-center gap-1.5\">\n"
     f"              <div class=\"{alert_dot_size} rounded-full {alert_dot_style}\"></div>\n"
-    f"              <span class=\"text-[8px] {alert_text_style}\">\u5371\u967a</span>\n"
+    f"              <span class=\"text-[8px] {alert_text_style}\">危険</span>\n"
     "            </div>\n"
     "          </div>\n"
     "          <div class=\"w-px h-12 bg-ark-border\"></div>\n"
     "          <div>\n"
     f"            <p class=\"text-4xl font-black {judge_text_c} leading-none mb-1\">{judge_label}</p>\n"
-
     "          </div>\n"
     "        </div>\n"
     "        <div class=\"flex gap-3 sm:ml-auto\">\n"
@@ -1234,12 +1554,10 @@ html = (
     "    </div>\n"
     "  </section>\n"
 
-    # カテゴリ + AIエージェント + スコアバー
     "\n  <div class=\"grid grid-cols-1 md:grid-cols-2 gap-5\">\n"
     "    <div class=\"flex flex-col gap-3\">\n"
     + cards_html +
     "    </div>\n"
-
     "    <div class=\"flex flex-col gap-4\">\n"
     + calendar_html +
     "      <div class=\"stripe bg-ark-card border border-violet-500/20 rounded-2xl p-4 glow-violet flex-1\">\n"
@@ -1265,27 +1583,19 @@ html = (
     + priority_candidates_html +
     "\n        </div>\n"
     "      </div>\n"
-
-    "    </div>\n"  
+    "    </div>\n"
     "  </div>\n"
-
-    # Daily view wrapper end
     + '</div>'
 
-    # Weekly view
     + '<div id="weekly-view" style="display:none" class="flex flex-col gap-5">'
-
     + f'<section><div class="flex items-baseline gap-3 mb-2"><span class="text-[10px] font-bold text-ark-muted tracking-[.2em] uppercase">Weekly Condition</span><span class="text-[10px] text-ark-muted">{w_period}</span></div>'
     + f'<div class="bg-ark-card border ' + w_judge_border + ' rounded-2xl p-5 glow-amber"><div class="flex flex-col sm:flex-row sm:items-center gap-5">'
-    + '<div class="flex items-center gap-4">'
-    + '<div class="flex items-end gap-2.5">'
+    + '<div class="flex items-center gap-4"><div class="flex items-end gap-2.5">'
     + f'<div class="flex flex-col items-center gap-1.5"><div class="{"w-8 h-8" if w_judge_label == "🏻絶好調" else "w-5 h-5"} rounded-full {"bg-green-400 shadow-[0_0_14px_rgba(34,197,94,.75)]" if w_judge_label == "🏻絶好調" else "bg-green-500/15 border border-green-500/20"}"></div><span class="text-[8px] {"text-green-400 font-black" if w_judge_label == "🏻絶好調" else "text-green-500/40 font-bold"}">絶好調</span></div>'
     + f'<div class="flex flex-col items-center gap-1.5"><div class="{"w-8 h-8" if w_judge_label == "📈成長中" else "w-5 h-5"} rounded-full {"bg-amber-400 shadow-[0_0_14px_rgba(251,191,36,.75)]" if w_judge_label == "📈成長中" else "bg-amber-500/15 border border-amber-500/20"}"></div><span class="text-[8px] {"text-amber-400 font-black" if w_judge_label == "📈成長中" else "text-amber-500/40 font-bold"}">成長中</span></div>'
     + f'<div class="flex flex-col items-center gap-1.5"><div class="{"w-8 h-8" if w_judge_label == "🔧要改善" else "w-5 h-5"} rounded-full {"bg-red-400 shadow-[0_0_14px_rgba(239,68,68,.75)]" if w_judge_label == "🔧要改善" else "bg-red-500/15 border border-red-500/20"}"></div><span class="text-[8px] {"text-red-400 font-black" if w_judge_label == "🔧要改善" else "text-red-500/40 font-bold"}">要改善</span></div>'
-    + '</div>'
-    + '<div class="w-px h-12 bg-ark-border"></div>'
-    + f'<div><p class="text-2xl font-black {w_judge_text_c} leading-none">{w_judge_label}</p></div>'
-    + '</div>'
+    + '</div><div class="w-px h-12 bg-ark-border"></div>'
+    + f'<div><p class="text-2xl font-black {w_judge_text_c} leading-none">{w_judge_label}</p></div></div>'
     + f'<div class="flex gap-3 sm:ml-auto"><div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-[9px] text-ark-muted mb-1">体重平均</p><p class="text-base font-black text-white">' + str(w_weight_avg) + '<span class="text-xs font-normal text-ark-muted">kg</span></p></div>'
     + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-[9px] text-ark-muted mb-1">睡眠平均</p><p class="text-base font-black text-amber-300">' + str(w_sleep_avg) + '<span class="text-xs font-normal">h</span></p></div>'
     + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[70px]"><p class="text-[9px] text-ark-muted mb-1">体調</p><p class="text-base font-black text-white">' + w_cond_summary + '</p></div>'
@@ -1297,20 +1607,15 @@ html = (
     + weekly_comment_html
     + '</div></div></div>'
 
-    # Monthly view
     + '<div id="monthly-view" style="display:none" class="flex flex-col gap-5">'
-
     + f'<section><div class="flex items-baseline gap-3 mb-2"><span class="text-[10px] font-bold text-ark-muted tracking-[.2em] uppercase">Monthly Condition</span><span class="text-[10px] text-ark-muted">{m_period}</span></div>'
     + f'<div class="bg-ark-card border ' + m_judge_border + ' rounded-2xl p-5 glow-amber"><div class="flex flex-col sm:flex-row sm:items-center gap-5">'
-    + '<div class="flex items-center gap-4">'
-    + '<div class="flex items-end gap-2.5">'
+    + '<div class="flex items-center gap-4"><div class="flex items-end gap-2.5">'
     + f'<div class="flex flex-col items-center gap-1.5"><div class="{"w-8 h-8" if m_judge_label == "🏅絶好調" else "w-5 h-5"} rounded-full {"bg-green-400 shadow-[0_0_14px_rgba(34,197,94,.75)]" if m_judge_label == "🏅絶好調" else "bg-green-500/15 border border-green-500/20"}"></div><span class="text-[8px] {"text-green-400 font-black" if m_judge_label == "🏅絶好調" else "text-green-500/40 font-bold"}">絶好調</span></div>'
     + f'<div class="flex flex-col items-center gap-1.5"><div class="{"w-8 h-8" if m_judge_label == "📊成長中" else "w-5 h-5"} rounded-full {"bg-amber-400 shadow-[0_0_14px_rgba(251,191,36,.75)]" if m_judge_label == "📊成長中" else "bg-amber-500/15 border border-amber-500/20"}"></div><span class="text-[8px] {"text-amber-400 font-black" if m_judge_label == "📊成長中" else "text-amber-500/40 font-bold"}">成長中</span></div>'
     + f'<div class="flex flex-col items-center gap-1.5"><div class="{"w-8 h-8" if m_judge_label == "🔄要改善" else "w-5 h-5"} rounded-full {"bg-red-400 shadow-[0_0_14px_rgba(239,68,68,.75)]" if m_judge_label == "🔄要改善" else "bg-red-500/15 border border-red-500/20"}"></div><span class="text-[8px] {"text-red-400 font-black" if m_judge_label == "🔄要改善" else "text-red-500/40 font-bold"}">要改善</span></div>'
-    + '</div>'
-    + '<div class="w-px h-12 bg-ark-border"></div>'
-    + f'<div><p class="text-2xl font-black {m_judge_text_c} leading-none">{m_judge_label}</p></div>'
-    + '</div>'
+    + '</div><div class="w-px h-12 bg-ark-border"></div>'
+    + f'<div><p class="text-2xl font-black {m_judge_text_c} leading-none">{m_judge_label}</p></div></div>'
     + f'<div class="flex gap-3 sm:ml-auto"><div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-[9px] text-ark-muted mb-1">体重平均</p><p class="text-base font-black text-white">' + str(m_weight_avg) + '<span class="text-xs font-normal text-ark-muted">kg</span></p></div>'
     + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-[9px] text-ark-muted mb-1">睡眠平均</p><p class="text-base font-black text-amber-300">' + str(m_sleep_avg) + '<span class="text-xs font-normal">h</span></p></div>'
     + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[70px]"><p class="text-[9px] text-ark-muted mb-1">体調</p><p class="text-base font-black text-white">' + m_cond_summary + '</p></div>'
@@ -1322,7 +1627,6 @@ html = (
     + monthly_comment_html
     + '</div></div></div>'
 
-    # タブJS
     + '<script>var ON="tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border";var OFF="tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted";function switchTab(t){document.getElementById("daily-view").style.display=t==="daily"?"":"none";document.getElementById("weekly-view").style.display=t==="weekly"?"":"none";document.getElementById("monthly-view").style.display=t==="monthly"?"":"none";document.getElementById("badge-daily").style.display=t==="daily"?"":"none";document.getElementById("badge-weekly").style.display=t==="weekly"?"":"none";document.getElementById("badge-monthly").style.display=t==="monthly"?"":"none";document.getElementById("tab-daily").className=t==="daily"?ON:OFF;document.getElementById("tab-weekly").className=t==="weekly"?ON:OFF;document.getElementById("tab-monthly").className=t==="monthly"?ON:OFF;}</script>'
 
     "\n  <footer class=\"flex items-center justify-between pt-1 pb-3\">\n"
