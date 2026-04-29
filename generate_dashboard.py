@@ -81,7 +81,9 @@ def fetch_journal_entries(start_date_str, end_date_str):
             },
             timeout=15,
         )
-        res.raise_for_status()
+        if not res.ok:
+            print(f"[WARN] Daily Journal APIエラー詳細: {res.status_code} {res.text[:500]}")
+            return []
         entries = []
         for page in res.json().get("results", []):
             props = page["properties"]
@@ -133,7 +135,9 @@ def fetch_weekly_journal_entries(start_date_str, end_date_str):
             },
             timeout=15,
         )
-        res.raise_for_status()
+        if not res.ok:
+            print(f"[WARN] Weekly Journal APIエラー詳細: {res.status_code} {res.text[:500]}")
+            return []
         entries = []
         for page in res.json().get("results", []):
             props = page["properties"]
