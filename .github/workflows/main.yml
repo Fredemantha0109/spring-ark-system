@@ -36,7 +36,7 @@ jobs:
           NOTION_TOKEN: ${{ secrets.NOTION_API_TOKEN }}
           DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
           SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}
-          SURGE_DOMAIN: ${{ secrets.SURGE_DOMAIN }}
+          SURGE_DOMAIN: spring-ark-dashboard.surge.sh
           GH_PAT: ${{ secrets.GH_PAT }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           CALENDAR_DATABASE_ID: ${{ secrets.CALENDAR_DATABASE_ID }}
@@ -50,5 +50,5 @@ jobs:
           DATABASE_ID: ${{ secrets.NOTION_DATABASE_ID }}
           LINE_ACCESS_TOKEN: ${{ secrets.LINE_ACCESS_TOKEN }}
           LINE_USER_ID: ${{ secrets.LINE_USER_ID }}
-          SURGE_DOMAIN: ${{ secrets.SURGE_DOMAIN }}
+          SURGE_DOMAIN: spring-ark-dashboard.surge.sh
         run: python send_line.py
