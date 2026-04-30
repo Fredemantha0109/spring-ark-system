@@ -358,7 +358,7 @@ def _training_rows_html(sessions):
             sign = "+" if diff > 0 else ""
             diff_html = f'<span class="text-[9px] {clr} font-bold ml-1">{sign}{diff}kg</span>'
             w = f'<span class="text-sm font-black text-white">{jisseki}kg</span><span class="text-[9px] text-ark-muted ml-1">/目標{mokuhyo}kg</span>{diff_html}'
-        elif mokuhyo and not jisseki:
+        elif mokuhyo is not None and mokuhyo > 0 and not jisseki:
             w = f'<span class="text-sm font-black text-white/40">{mokuhyo}kg</span><span class="text-[9px] text-ark-muted ml-1">未実施</span>'
         elif jisseki:
             w = f'<span class="text-sm font-black text-white">{jisseki}kg</span>'
