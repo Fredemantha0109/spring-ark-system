@@ -44,6 +44,8 @@ jobs:
           JOURNAL_WEEKLY_DATABASE_ID: ${{ secrets.JOURNAL_WEEKLY_DATABASE_ID }}
           JOURNAL_MONTHLY_DATABASE_ID: ${{ secrets.JOURNAL_MONTHLY_DATABASE_ID }}
           TRAINING_DATABASE_ID: ${{ secrets.TRAINING_DATABASE_ID }}
+          TOPIC_CARD_DATABASE_ID: ${{ secrets.TOPIC_CARD_DATABASE_ID }}
+          REUSE_LOG_DATABASE_ID: ${{ secrets.REUSE_LOG_DATABASE_ID }}
         run: python generate_dashboard.py
       - name: Send LINE notification
         env:
