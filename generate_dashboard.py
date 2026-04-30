@@ -22,8 +22,6 @@ JOURNAL_DATABASE_ID          = os.environ.get("JOURNAL_DATABASE_ID", "")
 JOURNAL_WEEKLY_DATABASE_ID   = os.environ.get("JOURNAL_WEEKLY_DATABASE_ID", "")
 JOURNAL_MONTHLY_DATABASE_ID  = os.environ.get("JOURNAL_MONTHLY_DATABASE_ID", "")
 TRAINING_DATABASE_ID         = os.environ.get("TRAINING_DATABASE_ID", "")
-TOPIC_CARD_DATABASE_ID       = os.environ.get("TOPIC_CARD_DATABASE_ID", "")
-REUSE_LOG_DATABASE_ID        = os.environ.get("REUSE_LOG_DATABASE_ID", "")
 
 HEADERS = {
     "Authorization": f"Bearer {NOTION_TOKEN}",
@@ -413,181 +411,6 @@ def training_summary_html(sessions, period_label):
         '</div>' + rows + '</div>'
     )
 # ── ▲ トレーニングログ取得ユーティリティ ここまで ───
-
-# ── ▼ 英語学習データ取得ユーティリティ ─────────────
-def fetch_topic_cards():
-    """トピックカードDBから全カードを取得"""
-    if not TOPIC_CARD_DATABASE_ID:
-        return []
-    try:
-        res = requests.post(
-            f"https://api.notion.com/v1/databases/{TOPIC_CARD_DATABASE_ID}/query",
-            headers=HEADERS,
-            json={"sorts": [{"property": "最終練習日", "direction": "descending"}]},
-            timeout=10
-        )
-        results = res.json().get("results", [])
-        cards = []
-        for r in results:
-            p = r.get("properties", {})
-            topic = ""
-            title_items = p.get("トピック名", {}).get("title", [])
-            if title_items:
-                topic = title_items[0].get("plain_text", "")
-            group_prop = p.get("グループ", {}).get("select")
-            group = group_prop.get("name", "") if isinstance(group_prop, dict) else ""
-            score_prop = p.get("話せる度", {}).get("number")
-            score = score_prop if score_prop is not None else 0
-            last_date = (p.get("最終練習日", {}).get("date") or {}).get("start", "")
-            stuck = ""
-            stuck_items = p.get("詰まったフレーズ", {}).get("rich_text", [])
-            if stuck_items:
-                stuck = stuck_items[0].get("plain_text", "")[:100]
-            if topic:
-                cards.append({
-                    "topic": topic,
-                    "group": group,
-                    "score": score,
-                    "last_date": last_date,
-                    "stuck": stuck,
-                })
-        print(f"[OK] トピックカード取得: {len(cards)}件")
-        return cards
-    except Exception as e:
-        print(f"[WARN] Topic card fetch error: {e}")
-        return []
-
-
-def fetch_reuse_log_period(start_str, end_str):
-    """指定期間のフレーズログを取得"""
-    if not REUSE_LOG_DATABASE_ID:
-        return []
-    try:
-        res = requests.post(
-            f"https://api.notion.com/v1/databases/{REUSE_LOG_DATABASE_ID}/query",
-            headers=HEADERS,
-            json={
-                "filter": {
-                    "and": [
-                        {"property": "日付", "date": {"on_or_after": start_str}},
-                        {"property": "日付", "date": {"on_or_before": end_str}},
-                    ]
-                },
-                "sorts": [{"property": "日付", "direction": "ascending"}],
-            },
-            timeout=10
-        )
-        results = res.json().get("results", [])
-        logs = []
-        for r in results:
-            p = r.get("properties", {})
-            phrase = ""
-            title_items = p.get("対象表現", {}).get("title", [])
-            if not title_items:
-                title_items = p.get("Name", {}).get("title", [])
-            if title_items:
-                phrase = title_items[0].get("plain_text", "")
-            tool_prop = p.get("ツール", {}).get("select")
-            tool = tool_prop.get("name", "") if isinstance(tool_prop, dict) else ""
-            used = p.get("見ずに使えた（BC）", {}).get("checkbox", False)
-            date_val = (p.get("日付", {}).get("date") or {}).get("start", "")
-            if phrase:
-                logs.append({
-                    "phrase": phrase,
-                    "tool": tool,
-                    "used": used,
-                    "date": date_val,
-                })
-        print(f"[OK] フレーズログ取得: {len(logs)}件 ({start_str}〜{end_str})")
-        return logs
-    except Exception as e:
-        print(f"[WARN] Reuse log fetch error: {e}")
-        return []
-
-
-def build_english_prompt_section(topic_cards, reuse_logs):
-    """Claude APIに渡す英語学習セクションを構築"""
-    if not topic_cards and not reuse_logs:
-        return ""
-
-    lines = []
-
-    if topic_cards:
-        lines.append("【英語学習：トピックカード状況】")
-        for c in topic_cards[:10]:
-            last = c["last_date"] or "未練習"
-            stuck_str = f" / 詰まり:{c['stuck'][:30]}" if c["stuck"] else ""
-            lines.append(f"・{c['topic']}（{c['group']}）: 話せる度{c['score']}/5 最終練習:{last}{stuck_str}")
-
-    if reuse_logs:
-        total = len(reuse_logs)
-        used_count = sum(1 for l in reuse_logs if l["used"])
-        used_rate = round(used_count / total * 100) if total > 0 else 0
-        lines.append(f"【英語学習：フレーズログ】")
-        lines.append(f"・今期記録数: {total}件 / 見ずに使えた率: {used_rate}%")
-        recent = reuse_logs[-3:]
-        for l in recent:
-            lines.append(f"・{l['date']} [{l['tool']}] {l['phrase'][:30]}")
-
-    return "\n" + "\n".join(lines) + "\n"
-# ── ▲ 英語学習データ取得ユーティリティ ここまで ─────
-
-# ── ▼ 英語学習AI分析 ─────────────────────────────
-def generate_english_analysis(topic_cards, reuse_logs, score_c):
-    """英語学習専用のAI分析を生成"""
-    if not ANTHROPIC_API_KEY or (not topic_cards and not reuse_logs):
-        return "", "", ""
-
-    total = len(reuse_logs)
-    used_count = sum(1 for l in reuse_logs if l["used"])
-    used_rate = round(used_count / total * 100) if total > 0 else 0
-
-    patapra_count = sum(1 for l in reuse_logs if l["tool"] == "PataPra")
-    sb_count = sum(1 for l in reuse_logs if l["tool"] == "SpeakBuddy")
-
-    cards_str = ""
-    for c in topic_cards:
-        last = c["last_date"] or "未練習"
-        stuck_str = f"／詰まり:{c['stuck'][:20]}" if c["stuck"] else ""
-        cards_str += f"・{c['topic']}（{c['group']}）: {c['score']}/5 最終:{last}{stuck_str}\n"
-
-    prompt = (
-        "あなたはSpring Arkプロジェクトの英語学習コーチです。\n"
-        "以下のデータをもとに、英語学習分析を3つのセクションに分けてJSON形式で出力してください。\n\n"
-        f"【COMMUNICATIONスコア】{score_c}/100\n\n"
-        f"【トピックカード状況】\n{cards_str}\n"
-        f"【フレーズログ】\n"
-        f"・記録数: {total}件\n"
-        f"・見ずに使えた率: {used_rate}%\n"
-        f"・PataPra: {patapra_count}件 / SpeakBuddy: {sb_count}件\n\n"
-        "【出力形式】必ずJSONオブジェクトのみ出力してください。\n"
-        "{\n"
-        '  "overall": "今期の英語学習の総合評価（80字以内）",\n'
-        '  "retention": "フレーズ定着率の傾向と考察（80字以内）",\n'
-        '  "priority": "今後優先すべき練習トピックと理由（80字以内）"\n'
-        "}"
-    )
-
-    try:
-        res = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 600, "messages": [{"role": "user", "content": prompt}]},
-            timeout=20,
-        )
-        import json as _j
-        text = res.json()["content"][0]["text"].strip()
-        start_j, end_j = text.find("{"), text.rfind("}") + 1
-        if start_j >= 0 and end_j > start_j:
-            parsed = _j.loads(text[start_j:end_j])
-            overall   = str(parsed.get("overall",   "")).strip()[:120]
-            retention = str(parsed.get("retention", "")).strip()[:120]
-            priority  = str(parsed.get("priority",  "")).strip()[:120]
-            return overall, retention, priority
-    except Exception as e:
-        print(f"[WARN] English analysis error: {e}")
-    return "", "", ""
-# ── ▲ 英語学習AI分析 ここまで ───────────────────────
 
 
 # ── 今日のページ（体重・睡眠・体調）+ 昨日のページ（スコア・タスク）──
@@ -1393,104 +1216,13 @@ m_journal_monthly_entries = fetch_monthly_journal_entries(
 
 
 # ── ▼ トレーニングデータ取得 ─────────────────────
-today_training   = fetch_training_data(today)
+today_training   = fetch_training_data(yesterday)
 weekly_training  = fetch_training_period(_last_monday.strftime("%Y-%m-%d"), _last_sunday.strftime("%Y-%m-%d"))
 monthly_training = fetch_training_period(_last_month_start.strftime("%Y-%m-%d"), _last_month_end.strftime("%Y-%m-%d"))
-today_training_html   = training_card_html(today_training,  "TODAY'S TRAINING")
+today_training_html   = training_card_html(today_training,  "YESTERDAY'S TRAINING")
 weekly_training_html  = training_summary_html(weekly_training,  "WEEKLY")
 monthly_training_html = training_summary_html(monthly_training, "MONTHLY")
 # ── ▲ トレーニングデータ取得ここまで ─────────────
-
-# ── ▼ 英語学習データ取得 ─────────────────────────
-topic_cards = fetch_topic_cards()
-weekly_reuse_logs  = fetch_reuse_log_period(
-    _last_monday.strftime("%Y-%m-%d"),
-    _last_sunday.strftime("%Y-%m-%d")
-)
-monthly_reuse_logs = fetch_reuse_log_period(
-    _last_month_start.strftime("%Y-%m-%d"),
-    _last_month_end.strftime("%Y-%m-%d")
-)
-# ── ▲ 英語学習データ取得ここまで ─────────────────
-
-# ── ▼ 英語学習AI分析実行 ─────────────────────────
-w_english_overall, w_english_retention, w_english_priority = generate_english_analysis(
-    topic_cards, weekly_reuse_logs, w_score_c
-)
-m_english_overall, m_english_retention, m_english_priority = generate_english_analysis(
-    topic_cards, monthly_reuse_logs, m_score_c
-)
-# ── ▲ 英語学習AI分析実行ここまで ─────────────────
-
-   # ── ▼ 英語分析パネルHTML（Weekly）─────────────────
-def make_english_panel_html(overall, retention, priority, reuse_logs, topic_cards):
-    if not overall and not retention and not priority:
-        return '<p class="text-xs text-ark-muted text-center py-4">英語学習データがありません</p>'
-
-    total = len(reuse_logs)
-    used_count = sum(1 for l in reuse_logs if l["used"])
-    used_rate = round(used_count / total * 100) if total > 0 else 0
-
-    cards_html = ""
-    for c in topic_cards:
-        score = c["score"]
-        bar_w = score * 20
-        last = c["last_date"][-5:] if c["last_date"] else "未練習"
-        cards_html += (
-            f'<div class="flex items-center gap-2 py-1.5 border-b border-ark-border/30 last:border-0">'
-            f'<div class="flex-1 min-w-0">'
-            f'<p class="text-xs text-white/80 truncate">{c["topic"]}</p>'
-            f'<p class="text-[9px] text-ark-muted">{c["group"]} · 最終:{last}</p>'
-            f'</div>'
-            f'<div class="flex items-center gap-1.5 flex-shrink-0">'
-            f'<div class="w-16 h-1.5 bg-ark-dim rounded-full overflow-hidden">'
-            f'<div class="h-full bg-amber-400/70 rounded-full" style="width:{bar_w}%"></div>'
-            f'</div>'
-            f'<span class="text-[9px] text-amber-400 font-black w-6 text-right">{score}/5</span>'
-            f'</div></div>'
-        )
-
-    sections = []
-    if overall:
-        sections.append(
-            f'<div class="bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">'
-            f'<p class="text-[9px] font-black text-amber-400 mb-1">総合評価</p>'
-            f'<p class="text-xs text-white/80 leading-relaxed">{overall}</p>'
-            f'</div>'
-        )
-    if retention:
-        sections.append(
-            f'<div class="bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">'
-            f'<p class="text-[9px] font-black text-amber-400 mb-1">フレーズ定着率　{used_rate}%（{used_count}/{total}件）</p>'
-            f'<p class="text-xs text-white/80 leading-relaxed">{retention}</p>'
-            f'</div>'
-        )
-    if priority:
-        sections.append(
-            f'<div class="bg-ark-dim/40 border border-teal-500/20 rounded-xl px-3 py-2.5">'
-            f'<p class="text-[9px] font-black text-teal-400 mb-1">優先練習トピック</p>'
-            f'<p class="text-xs text-white/80 leading-relaxed">{priority}</p>'
-            f'</div>'
-        )
-    if cards_html:
-        sections.append(
-            f'<div class="bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">'
-            f'<p class="text-[9px] font-black text-amber-400 mb-1.5">トピックカード</p>'
-            + cards_html +
-            f'</div>'
-        )
-
-    return '<div class="flex flex-col gap-2">' + "\n".join(sections) + '</div>'
-
-w_english_panel_html = make_english_panel_html(
-    w_english_overall, w_english_retention, w_english_priority,
-    weekly_reuse_logs, topic_cards
-)
-m_english_panel_html = make_english_panel_html(
-    m_english_overall, m_english_retention, m_english_priority,
-    monthly_reuse_logs, topic_cards
-)
-# ── ▲ 英語分析パネルHTML ここまで ──────────────────
 
 
 # ── ▼ generate_weekly_comment（ジャーナリング統合版）──
@@ -1499,8 +1231,6 @@ def generate_weekly_comment(
     w_weight_avg, w_sleep_avg, w_cond_summary, task_done_count,
     journal_entries=None,
     journal_weekly_entries=None,
-    topic_cards=None,
-    reuse_logs=None,
 ):
     if not ANTHROPIC_API_KEY:
         return [], ""
@@ -1520,7 +1250,6 @@ def generate_weekly_comment(
     missed_str = "\n".join(list(dict.fromkeys(missed_tasks_w))[:8]) or "なし"
 
     journal_section = build_journal_prompt_section(journal_entries or [])
-    english_section = build_english_prompt_section(topic_cards or [], reuse_logs or [])
     weekly_journal_section = build_weekly_journal_section(journal_weekly_entries or [])
 
     has_journal = bool(journal_section or weekly_journal_section)
@@ -1549,7 +1278,6 @@ def generate_weekly_comment(
         f"【未達が多かったタスク】\n{missed_str}\n"
         + weekly_journal_section
         + journal_section
-        + english_section
         + journal_instruction
         + "\n【出力形式】必ずJSONオブジェクトのみ出力してください。他のテキストは一切不要。\n"
         "{\n"
@@ -1588,8 +1316,6 @@ def generate_monthly_comment(
     journal_entries=None,
     journal_weekly_entries=None,
     journal_monthly_entries=None,
-    topic_cards=None,
-    reuse_logs=None,
 ):
     if not ANTHROPIC_API_KEY:
         return [], ""
@@ -1600,7 +1326,7 @@ def generate_monthly_comment(
     monthly_journal_section = build_monthly_journal_section(journal_monthly_entries or [])
     weekly_journal_section  = build_weekly_journal_section(journal_weekly_entries or [])
     daily_journal_section   = build_journal_monthly_section(journal_entries or [])
-    english_section = build_english_prompt_section(topic_cards or [], reuse_logs or [])
+
     has_journal = bool(monthly_journal_section or weekly_journal_section or daily_journal_section)
     journal_instruction = (
         "\nジャーナリングデータも踏まえ、以下を月次分析に含めてください:\n"
@@ -1628,7 +1354,6 @@ def generate_monthly_comment(
         + monthly_journal_section
         + weekly_journal_section
         + daily_journal_section
-        + english_section
         + journal_instruction
         + "\n【出力形式】必ずJSONオブジェクトのみ出力してください。他のテキストは一切不要。\n"
         "{\n"
@@ -1667,8 +1392,6 @@ monthly_summaries, monthly_analysis = generate_monthly_comment(
     journal_entries=m_journal_entries,
     journal_weekly_entries=m_journal_weekly_entries,
     journal_monthly_entries=m_journal_monthly_entries,
-    topic_cards=topic_cards,
-    reuse_logs=monthly_reuse_logs,
 )
 
 monthly_comment_html = ""
@@ -1725,15 +1448,11 @@ if monthly_summaries or monthly_analysis:
         '<button id="m-tab-score" onclick="switchMTab(\'score\')" '
         'class="m-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border">'
         'AI分析</button>'
-        '<button id="m-tab-english" onclick="switchMTab(\'english\')" '
-        'class="m-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted">'
-        '📊 英語分析</button>'
         '<button id="m-tab-journal" onclick="switchMTab(\'journal\')" '
         'class="m-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted">'
         '🔒 ジャーナリング</button>'
         '</div></div>'
         '<div id="m-panel-score">' + m_score_panel + '</div>'
-        '<div id="m-panel-english" style="display:none">' + m_english_panel_html + '</div>'
         '<div id="m-panel-journal" style="display:none">' + m_journal_panel + '</div>'
         '</div>'
         '<script>'
@@ -1741,10 +1460,8 @@ if monthly_summaries or monthly_analysis:
         '  var ON="m-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border";'
         '  var OFF="m-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted";'
         '  document.getElementById("m-panel-score").style.display=t==="score"?"":"none";'
-        '  document.getElementById("m-panel-english").style.display=t==="english"?"":"none";'
         '  document.getElementById("m-panel-journal").style.display=t==="journal"?"":"none";'
         '  document.getElementById("m-tab-score").className=t==="score"?ON:OFF;'
-        '  document.getElementById("m-tab-english").className=t==="english"?ON:OFF;'
         '  document.getElementById("m-tab-journal").className=t==="journal"?ON:OFF;'
         '}'
         '</script>'
@@ -1771,8 +1488,6 @@ weekly_summaries, weekly_analysis = generate_weekly_comment(
     w_weight_avg, w_sleep_avg, w_cond_summary, task_done_count,
     journal_entries=w_journal_entries,
     journal_weekly_entries=w_journal_weekly_entries,
-    topic_cards=topic_cards,
-    reuse_logs=weekly_reuse_logs,
 )
 
 weekly_comment_html = ""
@@ -1836,15 +1551,11 @@ if weekly_summaries or weekly_analysis:
         '<button id="w-tab-score" onclick="switchWTab(\'score\')" '
         'class="w-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border">'
         'AI分析</button>'
-        '<button id="w-tab-english" onclick="switchWTab(\'english\')" '
-        'class="w-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted">'
-        '📊 英語分析</button>'
         '<button id="w-tab-journal" onclick="switchWTab(\'journal\')" '
         'class="w-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted">'
         '🔒 ジャーナリング</button>'
         '</div></div>'
         '<div id="w-panel-score">' + score_panel + '</div>'
-        '<div id="w-panel-english" style="display:none">' + w_english_panel_html + '</div>'
         '<div id="w-panel-journal" style="display:none">' + journal_panel + '</div>'
         '</div>'
         '<script>'
@@ -1852,10 +1563,8 @@ if weekly_summaries or weekly_analysis:
         '  var ON="w-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border";'
         '  var OFF="w-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted";'
         '  document.getElementById("w-panel-score").style.display=t==="score"?"":"none";'
-        '  document.getElementById("w-panel-english").style.display=t==="english"?"":"none";'
         '  document.getElementById("w-panel-journal").style.display=t==="journal"?"":"none";'
         '  document.getElementById("w-tab-score").className=t==="score"?ON:OFF;'
-        '  document.getElementById("w-tab-english").className=t==="english"?ON:OFF;'
         '  document.getElementById("w-tab-journal").className=t==="journal"?ON:OFF;'
         '}'
         '</script>'
