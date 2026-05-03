@@ -301,9 +301,9 @@ def build_journal_monthly_section(entries):
     chunks = [entries[i:i+7] for i in range(0, len(entries), 7)]
     lines = []
     for week_idx, chunk in enumerate(chunks, 1):
-        discharges = [e["discharge"][:40] for e in chunk if e["discharge"]]
-        charges    = [e["charge"][:40]    for e in chunk if e["charge"]]
-        needs_list = [e["needs"][:40]     for e in chunk if e["needs"]]
+        discharges = [e["discharge"] for e in chunk if e["discharge"]]
+        charges    = [e["charge"]    for e in chunk if e["charge"]]
+        needs_list = [e["needs"]     for e in chunk if e["needs"]]
         if discharges or needs_list:
             lines.append(
                 f"[Week{week_idx}] "
@@ -1120,10 +1120,10 @@ m_journal_weekly_entries = fetch_weekly_journal_entries(
     _last_month_start.strftime("%Y-%m-%d"),
     _last_month_end.strftime("%Y-%m-%d"),
 )
-# Monthly JournalDB（運用開始後に有効化）
+# Monthly JournalDB（先月 + 今月両方を取得）
 m_journal_monthly_entries = fetch_monthly_journal_entries(
     _last_month_start.strftime("%Y-%m-%d"),
-    _last_month_end.strftime("%Y-%m-%d"),
+    _today.strftime("%Y-%m-%d"),   # 今月の入力日も含める
 )
 # ── ▲ ジャーナリングデータ取得ここまで ─────────────
 
