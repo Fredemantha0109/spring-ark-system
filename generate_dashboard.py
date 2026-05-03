@@ -173,7 +173,7 @@ def fetch_monthly_journal_entries(yymm_str):
                 "habit_emotion":     _get_rich_text(props, "行動と感情の相関"),
                 "next_experiment":   _get_rich_text(props, "来月への設計提案"),
             })
-        print(f"[OK] Monthly Journal取得: {len(entries)}件 ({start_date_str} 〜 {end_date_str})")
+        print(f"[OK] Monthly Journal取得: {len(entries)}件")
         return entries
 
     except Exception as e:
