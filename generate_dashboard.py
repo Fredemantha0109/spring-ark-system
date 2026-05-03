@@ -86,7 +86,7 @@ def fetch_journal_entries(start_date_str, end_date_str):
                 "discharge": _get_rich_text(props, "放電ログ")[:300],
                 "charge":    _get_rich_text(props, "充電ログ")[:300],
                 "emotion":   _get_rich_text(props, "感情と観察")[:300],
-                "needs":     _get_rich_text(props, "奥にあるニーズ")[:200],
+                "needs":     _get_rich_text(props, "奥にあるニーズ"),
                 "message":   _get_rich_text(props, "今日への一言")[:100],
             })
         print(f"[OK] ジャーナリング取得: {len(entries)}件 ({start_date_str} 〜 {end_date_str})")
@@ -129,9 +129,9 @@ def fetch_weekly_journal_entries(start_date_str, end_date_str):
             entries.append({
                 "date_range":      f"{start}〜{end}" if end else start,
                 "emotion_pattern": _get_rich_text(props, "感情パターン"),
-                "needs":           _get_rich_text(props, "奥にあるニーズ")[:200],
+                "needs":           _get_rich_text(props, "奥にあるニーズ"),
                 "env_relation":    _get_rich_text(props, "環境・状況との関係")[:200],
-                "next_question":   _get_rich_text(props, "来週への一つの問い")[:100],
+                "next_question":   _get_rich_text(props, "来週への一つの問い"),
             })
         print(f"[OK] Weekly Journal取得: {len(entries)}件 ({start_date_str} 〜 {end_date_str})")
         return entries
@@ -193,7 +193,7 @@ def build_weekly_journal_section(weekly_entries):
         if e["emotion_pattern"]: parts.append(f"感情パターン:{e['emotion_pattern']}")
         if e["needs"]:           parts.append(f"ニーズ:{e['needs'][:100]}")
         if e["env_relation"]:    parts.append(f"環境との関係:{e['env_relation'][:80]}")
-        if e["next_question"]:   parts.append(f"来週への問い:{e['next_question'][:60]}")
+        if e["next_question"]:   parts.append(f"来週への問い:{e['next_question']}")
         if parts:
             lines.append(f"[{e['date_range']}] " + " / ".join(parts))
     if not lines:
