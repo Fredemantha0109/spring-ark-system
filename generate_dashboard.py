@@ -128,7 +128,7 @@ def fetch_weekly_journal_entries(start_date_str, end_date_str):
             end   = date_prop.get("end", "")
             entries.append({
                 "date_range":      f"{start}〜{end}" if end else start,
-                "emotion_pattern": _get_rich_text(props, "感情パターン")[:200],
+                "emotion_pattern": _get_rich_text(props, "感情パターン"),
                 "needs":           _get_rich_text(props, "奥にあるニーズ")[:200],
                 "env_relation":    _get_rich_text(props, "環境・状況との関係")[:200],
                 "next_question":   _get_rich_text(props, "来週への一つの問い")[:100],
@@ -153,11 +153,11 @@ def fetch_monthly_journal_entries(start_date_str, end_date_str):
             json={
                 "filter": {
                     "and": [
-                        {"property": "日付", "date": {"on_or_after":  start_date_str}},
-                        {"property": "日付", "date": {"on_or_before": end_date_str}},
+                        {"property": "入力日", "date": {"on_or_after":  start_date_str}},
+                        {"property": "入力日", "date": {"on_or_before": end_date_str}},
                     ]
                 },
-                "sorts": [{"property": "日付", "direction": "ascending"}],
+                "sorts": [{"property": "入力日", "direction": "ascending"}],
             },
             timeout=15,
         )
@@ -170,8 +170,8 @@ def fetch_monthly_journal_entries(start_date_str, end_date_str):
             end   = date_prop.get("end", "")
             entries.append({
                 "date_range":        f"{start}〜{end}" if end else start,
-                "emotion_structure": _get_rich_text(props, "今月の感情パターン")[:300],
-                "charge_discharge":  _get_rich_text(props, "充電源と放電源のトップ3")[:300],
+                "emotion_structure": _get_rich_text(props, "感情パターン"),
+                "charge_discharge":  _get_rich_text(props, "放電感情") + " / " + _get_rich_text(props, "充電感情"),
                 "needs_priority":    _get_rich_text(props, "ニーズの優先順位")[:200],
                 "habit_emotion":     _get_rich_text(props, "行動と感情の相関")[:200],
                 "next_experiment":   _get_rich_text(props, "来月への設計提案")[:200],
@@ -190,7 +190,7 @@ def build_weekly_journal_section(weekly_entries):
     lines = []
     for e in weekly_entries:
         parts = []
-        if e["emotion_pattern"]: parts.append(f"感情パターン:{e['emotion_pattern'][:100]}")
+        if e["emotion_pattern"]: parts.append(f"感情パターン:{e['emotion_pattern']}")
         if e["needs"]:           parts.append(f"ニーズ:{e['needs'][:100]}")
         if e["env_relation"]:    parts.append(f"環境との関係:{e['env_relation'][:80]}")
         if e["next_question"]:   parts.append(f"来週への問い:{e['next_question'][:60]}")
