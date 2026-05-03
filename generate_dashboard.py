@@ -213,7 +213,7 @@ def build_monthly_journal_section(monthly_entries):
         parts = []
         if e["emotion_structure"]: parts.append(f"感情構造:{e['emotion_structure'][:120]}")
         if e["charge_discharge"]:  parts.append(f"充放電:{e['charge_discharge'][:120]}")
-        if e["needs_priority"]:    parts.append(f"ニーズ優先度:{e['needs_priority'][:80]}")
+        if e["needs_priority"]:    parts.append(f"ニーズ優先度:{e['needs_priority']}")
         if e["next_experiment"]:   parts.append(f"来月実験:{e['next_experiment'][:80]}")
         if parts:
             lines.append(f"[{e['date_range']}] " + " / ".join(parts))
@@ -235,8 +235,8 @@ def build_journal_prompt_section(entries, max_days=7):
         parts = []
         if e["discharge"]: parts.append(f"放電:{e['discharge'][:80]}")
         if e["charge"]:    parts.append(f"充電:{e['charge'][:80]}")
-        if e["needs"]:     parts.append(f"ニーズ:{e['needs'][:80]}")
-        if e["emotion"]:   parts.append(f"感情:{e['emotion'][:60]}")
+        if e["needs"]:     parts.append(f"ニーズ:{e['needs']}")
+        if e["emotion"]:   parts.append(f"感情:{e['emotion']}")
         if parts:
             lines.append(f"[{e['date']}] " + " / ".join(parts))
 
