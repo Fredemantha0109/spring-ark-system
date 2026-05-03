@@ -1591,6 +1591,77 @@ def generate_monthly_comment(
 
 
 # ── Weekly/Monthly AIコメント生成 ─────────────────
+
+# ── ▼ 英語分析パネルHTML ─────────────────────────
+def make_english_panel_html(overall, retention, priority, reuse_logs, topic_cards):
+    if not overall and not retention and not priority:
+        return '<p class="text-xs text-ark-muted text-center py-4">英語学習データがありません</p>'
+
+    total = len(reuse_logs)
+    used_count = sum(1 for l in reuse_logs if l["used"])
+    used_rate = round(used_count / total * 100) if total > 0 else 0
+
+    cards_html = ""
+    for c in topic_cards:
+        score = c["score"]
+        bar_w = score * 20
+        last = c["last_date"][-5:] if c["last_date"] else "未練習"
+        cards_html += (
+            f'<div class="flex items-center gap-2 py-1.5 border-b border-ark-border/30 last:border-0">'
+            f'<div class="flex-1 min-w-0">'
+            f'<p class="text-xs text-white/80 truncate">{c["topic"]}</p>'
+            f'<p class="text-[9px] text-ark-muted">{c["group"]} · 最終:{last}</p>'
+            f'</div>'
+            f'<div class="flex items-center gap-1.5 flex-shrink-0">'
+            f'<div class="w-16 h-1.5 bg-ark-dim rounded-full overflow-hidden">'
+            f'<div class="h-full bg-amber-400/70 rounded-full" style="width:{bar_w}%"></div>'
+            f'</div>'
+            f'<span class="text-[9px] text-amber-400 font-black w-6 text-right">{score}/5</span>'
+            f'</div></div>'
+        )
+
+    sections = []
+    if overall:
+        sections.append(
+            f'<div class="bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">'
+            f'<p class="text-[9px] font-black text-amber-400 mb-1">総合評価</p>'
+            f'<p class="text-xs text-white/80 leading-relaxed">{overall}</p>'
+            f'</div>'
+        )
+    if retention:
+        sections.append(
+            f'<div class="bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">'
+            f'<p class="text-[9px] font-black text-amber-400 mb-1">フレーズ定着率　{used_rate}%（{used_count}/{total}件）</p>'
+            f'<p class="text-xs text-white/80 leading-relaxed">{retention}</p>'
+            f'</div>'
+        )
+    if priority:
+        sections.append(
+            f'<div class="bg-ark-dim/40 border border-teal-500/20 rounded-xl px-3 py-2.5">'
+            f'<p class="text-[9px] font-black text-teal-400 mb-1">優先練習トピック</p>'
+            f'<p class="text-xs text-white/80 leading-relaxed">{priority}</p>'
+            f'</div>'
+        )
+    if cards_html:
+        sections.append(
+            f'<div class="bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">'
+            f'<p class="text-[9px] font-black text-amber-400 mb-1.5">トピックカード</p>'
+            + cards_html +
+            f'</div>'
+        )
+
+    return '<div class="flex flex-col gap-2">' + "\n".join(sections) + '</div>'
+
+w_english_panel_html = make_english_panel_html(
+    w_english_overall, w_english_retention, w_english_priority,
+    weekly_reuse_logs, topic_cards
+)
+m_english_panel_html = make_english_panel_html(
+    m_english_overall, m_english_retention, m_english_priority,
+    monthly_reuse_logs, topic_cards
+)
+# ── ▲ 英語分析パネルHTML ここまで ──────────────────
+
 monthly_summaries, monthly_analysis = generate_monthly_comment(
     m_score_w, m_score_c, m_score_ca, m_score_i, m_score_total,
     m_weight_avg, m_sleep_avg, m_cond_summary, m_task_done_count,
@@ -1793,75 +1864,6 @@ if weekly_summaries or weekly_analysis:
 else:
     weekly_comment_html = '<p class="text-xs text-ark-muted text-center py-4">週次分析データがありません</p>'
 
-    # ── ▼ 英語分析パネルHTML（Weekly）─────────────────
-def make_english_panel_html(overall, retention, priority, reuse_logs, topic_cards):
-    if not overall and not retention and not priority:
-        return '<p class="text-xs text-ark-muted text-center py-4">英語学習データがありません</p>'
-
-    total = len(reuse_logs)
-    used_count = sum(1 for l in reuse_logs if l["used"])
-    used_rate = round(used_count / total * 100) if total > 0 else 0
-
-    cards_html = ""
-    for c in topic_cards:
-        score = c["score"]
-        bar_w = score * 20
-        last = c["last_date"][-5:] if c["last_date"] else "未練習"
-        cards_html += (
-            f'<div class="flex items-center gap-2 py-1.5 border-b border-ark-border/30 last:border-0">'
-            f'<div class="flex-1 min-w-0">'
-            f'<p class="text-xs text-white/80 truncate">{c["topic"]}</p>'
-            f'<p class="text-[9px] text-ark-muted">{c["group"]} · 最終:{last}</p>'
-            f'</div>'
-            f'<div class="flex items-center gap-1.5 flex-shrink-0">'
-            f'<div class="w-16 h-1.5 bg-ark-dim rounded-full overflow-hidden">'
-            f'<div class="h-full bg-amber-400/70 rounded-full" style="width:{bar_w}%"></div>'
-            f'</div>'
-            f'<span class="text-[9px] text-amber-400 font-black w-6 text-right">{score}/5</span>'
-            f'</div></div>'
-        )
-
-    sections = []
-    if overall:
-        sections.append(
-            f'<div class="bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">'
-            f'<p class="text-[9px] font-black text-amber-400 mb-1">総合評価</p>'
-            f'<p class="text-xs text-white/80 leading-relaxed">{overall}</p>'
-            f'</div>'
-        )
-    if retention:
-        sections.append(
-            f'<div class="bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">'
-            f'<p class="text-[9px] font-black text-amber-400 mb-1">フレーズ定着率　{used_rate}%（{used_count}/{total}件）</p>'
-            f'<p class="text-xs text-white/80 leading-relaxed">{retention}</p>'
-            f'</div>'
-        )
-    if priority:
-        sections.append(
-            f'<div class="bg-ark-dim/40 border border-teal-500/20 rounded-xl px-3 py-2.5">'
-            f'<p class="text-[9px] font-black text-teal-400 mb-1">優先練習トピック</p>'
-            f'<p class="text-xs text-white/80 leading-relaxed">{priority}</p>'
-            f'</div>'
-        )
-    if cards_html:
-        sections.append(
-            f'<div class="bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">'
-            f'<p class="text-[9px] font-black text-amber-400 mb-1.5">トピックカード</p>'
-            + cards_html +
-            f'</div>'
-        )
-
-    return '<div class="flex flex-col gap-2">' + "\n".join(sections) + '</div>'
-
-w_english_panel_html = make_english_panel_html(
-    w_english_overall, w_english_retention, w_english_priority,
-    weekly_reuse_logs, topic_cards
-)
-m_english_panel_html = make_english_panel_html(
-    m_english_overall, m_english_retention, m_english_priority,
-    monthly_reuse_logs, topic_cards
-)
-# ── ▲ 英語分析パネルHTML ここまで ──────────────────
 
 def weekly_task_card(name, subtitle, icon_svg, color, score, task_rows_list):
     color_map = {
