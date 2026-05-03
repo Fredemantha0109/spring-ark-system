@@ -1694,21 +1694,41 @@ if monthly_summaries or monthly_analysis:
         '<p class="text-xs text-ark-muted text-center py-4">ジャーナリングデータがありません</p>'
         '</div>'
     )
-    if m_journal_weekly_entries:
+    if m_journal_monthly_entries:
         mj_items = []
-        for e in m_journal_weekly_entries:
-            if e.get("emotion_pattern"):
+        for e in m_journal_monthly_entries:
+            if e.get("emotion_structure"):
                 mj_items.append(
                     f'<div class="bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">'
-                    f'<p class="text-[9px] font-black text-teal-400 mb-1">{e.get("date_range","")} 感情パターン</p>'
-                    f'<p class="text-xs text-white/80 leading-relaxed">{e["emotion_pattern"]}</p>'
+                    f'<p class="text-[9px] font-black text-teal-400 mb-1">感情パターン</p>'
+                    f'<p class="text-xs text-white/80 leading-relaxed">{e["emotion_structure"]}</p>'
                     f'</div>'
                 )
-            if e.get("needs"):
+            if e.get("charge_discharge"):
                 mj_items.append(
                     f'<div class="bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">'
-                    f'<p class="text-[9px] font-black text-teal-400 mb-1">{e.get("date_range","")} ニーズ</p>'
-                    f'<p class="text-xs text-white/80 leading-relaxed">{e["needs"]}</p>'
+                    f'<p class="text-[9px] font-black text-teal-400 mb-1">放電 / 充電</p>'
+                    f'<p class="text-xs text-white/80 leading-relaxed">{e["charge_discharge"]}</p>'
+                )
+            if e.get("needs_priority"):
+                mj_items.append(
+                    f'<div class="bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">'
+                    f'<p class="text-[9px] font-black text-teal-400 mb-1">ニーズの優先順位</p>'
+                    f'<p class="text-xs text-white/80 leading-relaxed">{e["needs_priority"]}</p>'
+                    f'</div>'
+                )
+            if e.get("habit_emotion"):
+                mj_items.append(
+                    f'<div class="bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">'
+                    f'<p class="text-[9px] font-black text-teal-400 mb-1">行動と感情の相関</p>'
+                    f'<p class="text-xs text-white/80 leading-relaxed">{e["habit_emotion"]}</p>'
+                    f'</div>'
+                )
+            if e.get("next_experiment"):
+                mj_items.append(
+                    f'<div class="bg-ark0 rounded-xl px-3 py-2.5">'
+                    f'<p class="text-[9px] font-black text-teal-400 mb-1">来月への設計提案</p>'
+                    f'<p class="text-xs text-white/80 leading-relaxed">{e["next_experiment"]}</p>'
                     f'</div>'
                 )
         if mj_items:
