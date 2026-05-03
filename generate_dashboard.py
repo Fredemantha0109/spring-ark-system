@@ -665,8 +665,8 @@ def validate_weekly_monthly(parsed):
     analysis = str(parsed.get("analysis", "")).strip()
     if not analysis:
         analysis = "データが蓄積されると詳細な総合分析が表示されます。毎日の記録を続けることで精度が上がります。"
-    if len(analysis) > 300:
-        analysis = analysis[:300]
+    if len(analysis) > 600:
+        analysis = analysis[:600]
     return validated_summaries, analysis
 
 def generate_strategy(sleep_val, cond, judge, scores, missed_tasks, weight_val="-"):
