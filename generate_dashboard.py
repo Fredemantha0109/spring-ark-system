@@ -146,10 +146,10 @@ def fetch_weekly_journal_entries(start_date_str, end_date_str):
             end   = date_prop.get("end", "")
             entries.append({
                 "date_range":      f"{start}〜{end}" if end else start,
-                "emotion_pattern": _get_rich_text(props, "感情パターン")[:200],
-                "needs":           _get_rich_text(props, "奥にあるニーズ")[:200],
-                "env_relation":    _get_rich_text(props, "環境・状況との関係")[:200],
-                "next_question":   _get_rich_text(props, "来週への一つの問い")[:100],
+                "emotion_pattern": _get_rich_text(props, "感情パターン"),
+                "needs":           _get_rich_text(props, "奥にあるニーズ"),
+                "env_relation":    _get_rich_text(props, "環境・状況との関係"),
+                "next_question":   _get_rich_text(props, "来週への一つの問い"),
             })
         print(f"[OK] Weekly Journal取得: {len(entries)}件 ({start_date_str} 〜 {end_date_str})")
         return entries
