@@ -1476,6 +1476,7 @@ def generate_weekly_comment(
         + journal_section
         + english_section
         + journal_instruction
+        + f"\n【総合分析の指示】{analysis_instruction}\n"
         + "\n【出力形式】必ずJSONオブジェクトのみ出力してください。他のテキストは一切不要。\n"
         "{\n"
         '  "summaries": [\n'
@@ -1483,7 +1484,7 @@ def generate_weekly_comment(
         '    {"title": "要点タイトル(15文字以内)", "detail": "具体的分析(40文字以内)"},\n'
         '    {"title": "要点タイトル(15文字以内)", "detail": "具体的分析(40文字以内)"}\n'
         "  ],\n"
-        f'  "analysis": "{analysis_instruction}"\n'
+        '  "analysis": "ここに総合分析を記載"\n'
         "}"
     )
 
@@ -1555,6 +1556,7 @@ def generate_monthly_comment(
         + daily_journal_section
         + english_section
         + journal_instruction
+        + f"\n【総合分析の指示】{analysis_instruction}\n"
         + "\n【出力形式】必ずJSONオブジェクトのみ出力してください。他のテキストは一切不要。\n"
         "{\n"
         '  "summaries": [\n'
@@ -1562,7 +1564,7 @@ def generate_monthly_comment(
         '    {"title": "要点タイトル(15文字以内)", "detail": "具体的分析(40文字以内)"},\n'
         '    {"title": "要点タイトル(15文字以内)", "detail": "具体的分析(40文字以内)"}\n'
         "  ],\n"
-        f'  "analysis": "{analysis_instruction}"\n'
+        '  "analysis": "ここに総合分析を記載"\n'
         "}"
     )
 
@@ -1746,16 +1748,16 @@ if monthly_summaries or monthly_analysis:
         '📊 英語分析</button>'
         '<button id="m-tab-journal" onclick="switchMTab(\'journal\')" '
         'class="m-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted">'
+        '🔒 ジャーナリング</button>'
         '<button id="m-tab-training" onclick="switchMTab(\'training\')" '
         'class="m-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted">'
         '💪 トレーニング</button>'
-        '🔒 ジャーナリング</button>'
         '</div></div>'
         '<div id="m-panel-score">' + m_score_panel + '</div>'
         '<div id="m-panel-english" style="display:none">' + m_english_panel_html + '</div>'
         '<div id="m-panel-journal" style="display:none">' + m_journal_panel + '</div>'
-        '</div>'
         '<div id="m-panel-training" style="display:none">' + monthly_training_html + '</div>'
+        '</div>'
         '<script>'
         'function switchMTab(t){'
         '  var ON="m-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border";'
@@ -1763,13 +1765,13 @@ if monthly_summaries or monthly_analysis:
         '  document.getElementById("m-panel-score").style.display=t==="score"?"":"none";'
         '  document.getElementById("m-panel-english").style.display=t==="english"?"":"none";'
         '  document.getElementById("m-panel-journal").style.display=t==="journal"?"":"none";'
-        '  document.getElementById("m-tab-score").className=t==="score"?ON:OFF;'
         '  document.getElementById("m-panel-training").style.display=t==="training"?"":"none";'
+        '  document.getElementById("m-tab-score").className=t==="score"?ON:OFF;'
         '  document.getElementById("m-tab-english").className=t==="english"?ON:OFF;'
         '  document.getElementById("m-tab-journal").className=t==="journal"?ON:OFF;'
+        '  document.getElementById("m-tab-training").className=t==="training"?ON:OFF;'
         '}'
         '</script>'
-        '  document.getElementById("m-tab-training").className=t==="training"?ON:OFF;'
     )
 else:
     monthly_comment_html = '<p class="text-xs text-ark-muted text-center py-4">月次分析データがありません</p>'
@@ -1863,16 +1865,16 @@ if weekly_summaries or weekly_analysis:
         '📊 英語分析</button>'
         '<button id="w-tab-journal" onclick="switchWTab(\'journal\')" '
         'class="w-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted">'
+        '🔒 ジャーナリング</button>'
         '<button id="w-tab-training" onclick="switchWTab(\'training\')" '
         'class="w-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted">'
         '💪 トレーニング</button>'
-        '🔒 ジャーナリング</button>'
         '</div></div>'
         '<div id="w-panel-score">' + score_panel + '</div>'
         '<div id="w-panel-english" style="display:none">' + w_english_panel_html + '</div>'
         '<div id="w-panel-journal" style="display:none">' + journal_panel + '</div>'
-        '</div>'
         '<div id="w-panel-training" style="display:none">' + weekly_training_html + '</div>'
+        '</div>'
         '<script>'
         'function switchWTab(t){'
         '  var ON="w-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border";'
@@ -1880,14 +1882,15 @@ if weekly_summaries or weekly_analysis:
         '  document.getElementById("w-panel-score").style.display=t==="score"?"":"none";'
         '  document.getElementById("w-panel-english").style.display=t==="english"?"":"none";'
         '  document.getElementById("w-panel-journal").style.display=t==="journal"?"":"none";'
+        '  document.getElementById("w-panel-training").style.display=t==="training"?"":"none";'
         '  document.getElementById("w-tab-score").className=t==="score"?ON:OFF;'
         '  document.getElementById("w-tab-english").className=t==="english"?ON:OFF;'
-        '  document.getElementById("w-panel-training").style.display=t==="training"?"":"none";'
         '  document.getElementById("w-tab-journal").className=t==="journal"?ON:OFF;'
         '  document.getElementById("w-tab-training").className=t==="training"?ON:OFF;'
         '}'
         '</script>'
     )
+else:
     weekly_comment_html = '<p class="text-xs text-ark-muted text-center py-4">週次分析データがありません</p>'
 
 
