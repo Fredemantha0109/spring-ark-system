@@ -1382,10 +1382,8 @@ m_journal_weekly_entries = fetch_weekly_journal_entries(
     _last_month_start.strftime("%Y-%m-%d"),
     _last_month_end.strftime("%Y-%m-%d"),
 )
-m_journal_monthly_entries = fetch_monthly_journal_entries(
-    _last_month_start.strftime("%Y-%m-%d"),
-    _last_month_end.strftime("%Y-%m-%d"),
-)
+_last_month_yymm = _last_month_start.strftime("%y%m")
+m_journal_monthly_entries = fetch_monthly_journal_entries(_last_month_yymm)
 # ── ▲ ジャーナリングデータ取得ここまで ─────────────
 
 
