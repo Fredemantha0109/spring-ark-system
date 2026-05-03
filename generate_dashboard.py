@@ -141,7 +141,7 @@ def fetch_weekly_journal_entries(start_date_str, end_date_str):
         return []
 
 
-def fetch_monthly_journal_entries(start_date_str, end_date_str):
+def fetch_monthly_journal_entries(yymm_str):
     if not JOURNAL_MONTHLY_DATABASE_ID:
         print("[INFO] JOURNAL_MONTHLY_DATABASE_ID が未設定のためMonthlyジャーナリング取得をスキップ")
         return []
@@ -152,12 +152,9 @@ def fetch_monthly_journal_entries(start_date_str, end_date_str):
             headers=HEADERS,
             json={
                 "filter": {
-                    "and": [
-                        {"property": "入力日", "date": {"on_or_after":  start_date_str}},
-                        {"property": "入力日", "date": {"on_or_before": end_date_str}},
-                    ]
+                    "property": "YYMM",
+                    "title": {"equals": yymm_str}
                 },
-                "sorts": [{"property": "入力日", "direction": "ascending"}],
             },
             timeout=15,
         )
@@ -172,9 +169,9 @@ def fetch_monthly_journal_entries(start_date_str, end_date_str):
                 "date_range":        f"{start}〜{end}" if end else start,
                 "emotion_structure": _get_rich_text(props, "感情パターン"),
                 "charge_discharge":  _get_rich_text(props, "放電感情") + " / " + _get_rich_text(props, "充電感情"),
-                "needs_priority":    _get_rich_text(props, "ニーズの優先順位")[:200],
-                "habit_emotion":     _get_rich_text(props, "行動と感情の相関")[:200],
-                "next_experiment":   _get_rich_text(props, "来月への設計提案")[:200],
+                "needs_priority":    _get_rich_text(props, "ニーズの優先順位"),
+                "habit_emotion":     _get_rich_text(props, "行動と感情の相関"),
+                "next_experiment":   _get_rich_text(props, "来月への設計提案"),
             })
         print(f"[OK] Monthly Journal取得: {len(entries)}件 ({start_date_str} 〜 {end_date_str})")
         return entries
@@ -191,8 +188,8 @@ def build_weekly_journal_section(weekly_entries):
     for e in weekly_entries:
         parts = []
         if e["emotion_pattern"]: parts.append(f"感情パターン:{e['emotion_pattern']}")
-        if e["needs"]:           parts.append(f"ニーズ:{e['needs'][:100]}")
-        if e["env_relation"]:    parts.append(f"環境との関係:{e['env_relation'][:80]}")
+        if e["needs"]:           parts.append(f"ニーズ:{e['needs']}")
+        if e["env_relation"]:    parts.append(f"環境との関係:{e['env_relation']}")
         if e["next_question"]:   parts.append(f"来週への問い:{e['next_question']}")
         if parts:
             lines.append(f"[{e['date_range']}] " + " / ".join(parts))
