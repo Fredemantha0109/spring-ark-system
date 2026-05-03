@@ -1401,7 +1401,7 @@ if monthly_summaries or monthly_analysis:
         '🔒 ジャーナリング</button>'
         '</div></div>'
         '<div id="m-panel-score">' + m_score_panel + '</div>'
-        '<div id="m-panel-journal" style="display:none">' + m_journal_panel + '</div>'
+        '<div id="m-panel-journal" style="display:none;max-height:600px;overflow-y:auto">' + m_journal_panel + '</div>'
         '</div>'
         '<script>'
         'function switchMTab(t){'
@@ -1510,7 +1510,7 @@ if weekly_summaries or weekly_analysis:
         # スコア分析パネル
         '<div id="w-panel-score">' + score_panel + '</div>'
         # ジャーナリングパネル（デフォルト非表示）
-        '<div id="w-panel-journal" style="display:none">' + journal_panel + '</div>'
+        '<div id="w-panel-journal" style="display:none;max-height:600px;overflow-y:auto">' + journal_panel + '</div>'
         '</div>'
         # タブ切り替えJS
         '<script>'
