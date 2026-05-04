@@ -396,6 +396,7 @@ def training_summary_html(sessions, period_label):
     for s in sessions:
         shumoku = s.get("種目","")
         jisseki = s.get("実績")
+        print(f"[DEBUG] shumoku={shumoku!r} jisseki={jisseki!r}")
         if shumoku and jisseki is not None:
             if shumoku not in best or (jisseki is not None and (best[shumoku]["実績"] is None or jisseki > best[shumoku]["実績"])):
                 best[shumoku] = s
