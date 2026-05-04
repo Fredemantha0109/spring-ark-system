@@ -956,6 +956,34 @@ ICON_C  = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentC
 ICON_CA = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></svg>'
 ICON_I  = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>'
 
+# ── AI Agent 分析コメント生成 ──────────────────────
+def generate_agent_comment(sleep_val, cond, judge, scores, missed_tasks, weight_val, cal_events):
+    if not ANTHROPIC_API_KEY:
+        return ""
+    missed_str = "\n".join([f"・{cat}: {task}" for task, cat in missed_tasks]) or "なし"
+    cal_str = "\n".join([f"・{ev['start']} {ev['name']}" for ev in cal_events]) if cal_events else "なし"
+    score_str = f"W:{scores[0]} / C:{scores[1]} / Ca:{scores[2]} / I:{scores[3]}"
+    prompt = (
+        "あなたはSpring Arkのパーソナルコーチです。\n"
+        "以下のデータをもとに、今日のコンディションと状況を踏まえた分析コメントを2〜3文で出力してください。\n"
+        "JSONではなく自然な日本語テキストのみ出力してください。\n\n"
+        f"- 睡眠: {sleep_val}h / 体調: {cond} / 体重: {weight_val}kg / 判定: {judge}\n"
+        f"- スコア: {score_str}\n"
+        f"- 昨日の未達タスク: {missed_str}\n"
+        f"- 今日のカレンダー: {cal_str}\n"
+    )
+    try:
+        res = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 200, "messages": [{"role": "user", "content": prompt}]},
+            timeout=15,
+        )
+        return res.json()["content"][0]["text"].strip()
+    except Exception as e:
+        print(f"[WARN] Agent comment error: {e}")
+        return ""
+
 ai_html = ""
 if ai_note:
     lines = ai_note.strip().split("\n")
@@ -970,17 +998,6 @@ if ai_note:
                 '</div>'
             )
     ai_html = "\n".join(items)
-
-agent_comment_html = (
-    f'<div class="bg-ark-dim/40 border border-violet-500/15 rounded-xl px-3 py-2.5 mb-2">'
-    f'<p class="text-xs text-white/80 leading-relaxed">{agent_comment}</p>'
-    f'</div>'
-) if agent_comment else ""
-
-missed_html = ai_html if ai_html else '<p class="text-xs text-ark-muted text-center py-2">昨日の未達タスクなし 🎉</p>'
-ai_section_inner = agent_comment_html + missed_html
-
-
 
 # ── カレンダーDB取得 ──────────────────────────────
 calendar_events = []
@@ -1019,6 +1036,23 @@ if CALENDAR_DATABASE_ID:
                     calendar_events.append({"name": name, "start": start_time, "end": end_time})
     except Exception as e:
         print(f"[WARN] Calendar fetch error: {e}")
+
+agent_comment = generate_agent_comment(
+    sleep, condition, judge_label,
+    [score_w, score_c, score_ca, score_i],
+    missed_tasks_all[:8],
+    weight,
+    calendar_events
+)
+
+agent_comment_html = (
+    f'<div class="bg-ark-dim/40 border border-violet-500/15 rounded-xl px-3 py-2.5 mb-2">'
+    f'<p class="text-xs text-white/80 leading-relaxed">{agent_comment}</p>'
+    f'</div>'
+) if agent_comment else ""
+
+missed_html = ai_html if ai_html else '<p class="text-xs text-ark-muted text-center py-2">昨日の未達タスクなし 🎉</p>'
+ai_section_inner = agent_comment_html + missed_html
 
 calendar_html = ""
 if calendar_events:
@@ -1137,42 +1171,6 @@ load_badge_html = (
     f'<div class="inline-flex items-center gap-1.5 {load_badge_cls} rounded-full px-3 py-1.5 ml-2">'
     f'<span class="text-sm font-bold {load_text_c}">{load_label}</span>'
     f'</div>'
-)
-
-# ── AI Agent 分析コメント生成 ──────────────────────
-def generate_agent_comment(sleep_val, cond, judge, scores, missed_tasks, weight_val, cal_events):
-    if not ANTHROPIC_API_KEY:
-        return ""
-    missed_str = "\n".join([f"・{cat}: {task}" for task, cat in missed_tasks]) or "なし"
-    cal_str = "\n".join([f"・{ev['start']} {ev['name']}" for ev in cal_events]) if cal_events else "なし"
-    score_str = f"W:{scores[0]} / C:{scores[1]} / Ca:{scores[2]} / I:{scores[3]}"
-    prompt = (
-        "あなたはSpring Arkのパーソナルコーチです。\n"
-        "以下のデータをもとに、今日のコンディションと状況を踏まえた分析コメントを2〜3文で出力してください。\n"
-        "JSONではなく自然な日本語テキストのみ出力してください。\n\n"
-        f"- 睡眠: {sleep_val}h / 体調: {cond} / 体重: {weight_val}kg / 判定: {judge}\n"
-        f"- スコア: {score_str}\n"
-        f"- 昨日の未達タスク: {missed_str}\n"
-        f"- 今日のカレンダー: {cal_str}\n"
-    )
-    try:
-        res = requests.post(
-            "https://api.anthropic.com/v1/messages",
-            headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 200, "messages": [{"role": "user", "content": prompt}]},
-            timeout=15,
-        )
-        return res.json()["content"][0]["text"].strip()
-    except Exception as e:
-        print(f"[WARN] Agent comment error: {e}")
-        return ""
-
-agent_comment = generate_agent_comment(
-    sleep, condition, judge_label,
-    [score_w, score_c, score_ca, score_i],
-    missed_tasks_all[:8],
-    weight,
-    calendar_events
 )
 
 ai_strategies = generate_strategy(
