@@ -2181,8 +2181,9 @@ f"{score_diff_html}</div>\n"
     + today_training_html +
     "    </div>\n"
     "    <div class=\"flex flex-col gap-4\">\n"
-    + strategy_html          # ← 最上部に移動（カレンダーより前）
-    + calendar_html +
++ strategy_html
++ priority_candidates_html
++ calendar_html +
     "      <div id=\"agent\" class=\"stripe bg-ark-card border border-violet-500/20 rounded-2xl p-4 glow-violet flex-1\">\n"
     "        <div class=\"flex items-center gap-2 mb-5\">\n"
     "          <div class=\"w-7 h-7 rounded-xl bg-violet-500/20 border border-violet-500/30 flex items-center justify-center\">\n"
@@ -2201,8 +2202,7 @@ f"{score_diff_html}</div>\n"
     "        </div>\n"
     "        <div class=\"flex flex-col gap-2\">\n"
     + ai_section_inner
-    + system_trigger_html
-    + priority_candidates_html +
+    + system_trigger_html +
     "\n        </div>\n"
     "      </div>\n"
     "    </div>\n"
