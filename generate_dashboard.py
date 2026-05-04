@@ -289,6 +289,7 @@ def fetch_training_data(target_date_str):
             timeout=10
         )
         results = res.json().get("results", [])
+        print(f"[DEBUG] Training period: {len(results)} results for {start_str}~{end_str}")
         sessions = []
         for r in results:
             p = r.get("properties", {})
@@ -323,6 +324,7 @@ def fetch_training_period(start_str, end_str):
             timeout=10
         )
         results = res.json().get("results", [])
+        print(f"[DEBUG] Training period: {len(results)} results for {start_str}~{end_str}")
         sessions = []
         for r in results:
             p = r.get("properties", {})
@@ -424,6 +426,7 @@ def fetch_topic_cards():
             timeout=10
         )
         results = res.json().get("results", [])
+        print(f"[DEBUG] Training period: {len(results)} results for {start_str}~{end_str}")
         cards = []
         for r in results:
             p = r.get("properties", {})
@@ -475,6 +478,7 @@ def fetch_reuse_log_period(start_str, end_str):
             timeout=10
         )
         results = res.json().get("results", [])
+        print(f"[DEBUG] Training period: {len(results)} results for {start_str}~{end_str}")
         logs = []
         for r in results:
             p = r.get("properties", {})
