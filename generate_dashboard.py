@@ -1399,6 +1399,7 @@ monthly_training = fetch_training_period(_last_month_start.strftime("%Y-%m-%d"),
 today_training_html   = training_card_html(today_training,  "YESTERDAY'S TRAINING")
 weekly_training_html  = training_summary_html(weekly_training,  "WEEKLY")
 monthly_training_html = training_summary_html(monthly_training, "MONTHLY")
+print(f"[DEBUG] monthly_training_html length={len(monthly_training_html)}, preview={monthly_training_html[:80]}")
 # ── ▲ トレーニングデータ取得ここまで ─────────────
 
 # ── ▼ 英語学習データ取得 ─────────────────────────
