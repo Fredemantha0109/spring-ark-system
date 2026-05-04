@@ -984,7 +984,7 @@ if ai_strategies:
             '</div>'
         )
     strategy_html = (
-        '<div class="bg-ark-card border border-violet-500/15 rounded-2xl p-4">' +
+        '<div id="strategy" class="bg-ark-card border border-violet-500/15 rounded-2xl p-4">' +
         '<div class="flex items-center gap-2 mb-3">' +
         '<svg class="w-4 h-4 text-violet-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>' +
         '<p class="text-[10px] font-black text-violet-400 tracking-[.15em]">今日の推奨作戦</p>' +
@@ -1054,7 +1054,7 @@ if calendar_events:
             f'</div>'
         )
     calendar_html = (
-        '<div class="bg-ark-card border border-sky-500/20 rounded-2xl p-4 mt-4">'
+        '<div id="calendar" class="bg-ark-card border border-sky-500/20 rounded-2xl p-4 mt-4">'
         '<div class="flex items-center gap-2 mb-3">'
         '<svg class="w-4 h-4 text-sky-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>'
         '<p class="text-[10px] font-black text-sky-400 tracking-[.15em]">TODAY\'S CALENDAR</p>'
@@ -2162,6 +2162,19 @@ f"{score_diff_html}</div>\n"
     "    </div>\n"
     "  </section>\n"
 
+    # ── モバイル専用サマリーバー ──────────────────────
++ f'''<div class="md:hidden flex gap-2 overflow-x-auto pb-1">
+  <a href="#strategy" class="flex-shrink-0 flex items-center gap-1.5 bg-violet-500/15 border border-violet-500/25 rounded-full px-3 py-1.5">
+    <span class="text-[10px] font-black text-violet-300">💡 今日の作戦</span>
+  </a>
+  <a href="#calendar" class="flex-shrink-0 flex items-center gap-1.5 bg-sky-500/15 border border-sky-500/25 rounded-full px-3 py-1.5">
+    <span class="text-[10px] font-black text-sky-300">📅 予定 {len(calendar_events)}件</span>
+  </a>
+  <a href="#agent" class="flex-shrink-0 flex items-center gap-1.5 bg-ark-dim border border-ark-border rounded-full px-3 py-1.5">
+    <span class="text-[10px] font-black text-white/60">🤖 未達チェック</span>
+  </a>
+</div>'''
+
     "\n  <div class=\"grid grid-cols-1 md:grid-cols-2 gap-5\">\n"
     "    <div class=\"flex flex-col gap-3\">\n"
     + cards_html
@@ -2170,7 +2183,7 @@ f"{score_diff_html}</div>\n"
     "    <div class=\"flex flex-col gap-4\">\n"
     + strategy_html          # ← 最上部に移動（カレンダーより前）
     + calendar_html +
-    "      <div class=\"stripe bg-ark-card border border-violet-500/20 rounded-2xl p-4 glow-violet flex-1\">\n"
+    "      <div id=\"agent\" class=\"stripe bg-ark-card border border-violet-500/20 rounded-2xl p-4 glow-violet flex-1\">\n"
     "        <div class=\"flex items-center gap-2 mb-5\">\n"
     "          <div class=\"w-7 h-7 rounded-xl bg-violet-500/20 border border-violet-500/30 flex items-center justify-center\">\n"
     "            <svg class=\"w-4 h-4 text-violet-400\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"1.5\">"
