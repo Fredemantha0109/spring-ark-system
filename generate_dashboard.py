@@ -399,7 +399,8 @@ def training_summary_html(sessions, period_label):
         shumoku = s.get("種目","")
         jisseki = s.get("実績")
         if shumoku and jisseki is not None:
-            if shumoku not in best or jisseki > best[shumoku]["実績"]:
+            prev = best.get(shumoku, {}).get("実績")
+            if shumoku not in best or prev is None or jisseki > prev:
                 best[shumoku] = s
     if not best:
         return ""
