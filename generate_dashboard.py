@@ -1051,7 +1051,7 @@ agent_comment_html = (
     f'</div>'
 ) if agent_comment else ""
 
-missed_html = ai_html if ai_html else '<p class="text-xs text-ark-muted text-center py-2">昨日の未達タスクなし 🎉</p>'
+missed_html = ai_html if ai_html else '<p class="text-xs text-white/50 text-center py-2">昨日の未達タスクなし 🎉</p>'
 ai_section_inner = agent_comment_html + missed_html
 
 calendar_html = ""
@@ -2244,7 +2244,7 @@ f"{score_diff_html}</div>\n"
     "          </div>\n"
     "          <div>\n"
     "            <p class=\"text-[10px] font-black text-violet-400 tracking-[.15em]\">AI AGENT</p>\n"
-    "            <p class=\"text-[9px] text-ark-muted\">昨日の未達 → 今日の作戦</p>\n"
+    "            <p class=\"text-[9px] text-white/50\">昨日の未達 → 今日の作戦</p>\n"
     "          </div>\n"
     "        </div>\n"
     "        <div class=\"flex flex-col gap-2\">\n"
