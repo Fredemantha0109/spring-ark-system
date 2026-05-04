@@ -338,6 +338,8 @@ def fetch_training_period(start_str, end_str):
             })
         filtered = sorted([s for s in sessions if s.get("種目", "")], key=lambda x: x["日付"])
         print(f"[OK] トレーニング取得: {len(filtered)}件 ({start_str}〜{end_str})")
+        for s in filtered:
+            print(f"[DEBUG] {s['日付']} {s['種目']} 実績={s['実績']} type={type(s['実績'])}")
         return filtered
     except Exception as e:
         print(f"[WARN] Training period fetch error: {e}")
