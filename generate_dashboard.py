@@ -318,7 +318,6 @@ def fetch_training_period(start_str, end_str):
             json={"filter": {"and": [
                 {"property": "日付", "date": {"on_or_after": start_str}},
                 {"property": "日付", "date": {"on_or_before": end_str}},
-                
             ]}},
             timeout=10
         )
