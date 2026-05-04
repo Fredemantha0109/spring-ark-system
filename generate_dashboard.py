@@ -1812,7 +1812,7 @@ if monthly_summaries or monthly_analysis:
             f'<div class="flex items-start gap-3 bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">'
             f'<span class="w-5 h-5 rounded-full bg-violet-500/25 border border-violet-500/35 text-[9px] font-black text-violet-300 flex items-center justify-center flex-shrink-0 mt-0.5">{i}</span>'
             f'<div><p class="text-xs font-black text-white">{s.get("title","")}</p>'
-            f'<p class="text-[10px] text-ark-muted mt-0.5">{s.get("detail","")}</p></div>'
+            f'<p class="text-[10px] text-white/50 mt-0.5">{s.get("detail","")}</p></div>'
             f'</div>'
         )
     m_analysis_html = (
@@ -1943,7 +1943,7 @@ if weekly_summaries or weekly_analysis:
             f'<div class="flex items-start gap-3 bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">'
             f'<span class="w-5 h-5 rounded-full bg-violet-500/25 border border-violet-500/35 text-[9px] font-black text-violet-300 flex items-center justify-center flex-shrink-0 mt-0.5">{i}</span>'
             f'<div><p class="text-xs font-black text-white">{s.get("title","")}</p>'
-            f'<p class="text-[10px] text-ark-muted mt-0.5">{s.get("detail","")}</p></div>'
+            f'<p class="text-[10px] text-white/50 mt-0.5">{s.get("detail","")}</p></div>'
             f'</div>'
         )
     analysis_html = (
@@ -2063,7 +2063,7 @@ def weekly_task_card(name, subtitle, icon_svg, color, score, task_rows_list):
         '</div>'
         '<div>'
         '<p class="text-xs font-black ' + text_c + ' tracking-[.15em]">' + name + '</p>'
-        '<p class="text-xs text-ark-muted">' + subtitle + '</p>'
+        '<p class="text-xs text-white/50">' + subtitle + '</p>'
         '</div></div>'
         '<p class="text-xl font-black ' + text_c + '">' + str(score) + '<span class="text-sm text-ark-muted font-normal">/100点</span></p>'
         '</div>'
@@ -2259,7 +2259,7 @@ f"{score_diff_html}</div>\n"
     + '</div>'
 
     + '<div id="weekly-view" style="display:none" class="flex flex-col gap-5">'
-    + f'<section><div class="flex items-baseline gap-3 mb-2"><span class="text-[10px] font-bold text-ark-muted tracking-[.2em] uppercase">Weekly Condition</span><span class="text-[10px] text-ark-muted">{w_period}</span></div>'
+    + f'<section><div class="flex items-baseline gap-3 mb-2"><span class="text-[10px] font-bold text-white/50 tracking-[.2em] uppercase">Weekly Condition</span><span class="text-[10px] text-white/50">{w_period}</span></div>'
     + f'<div class="bg-ark-card border ' + w_judge_border + ' rounded-2xl p-5 glow-amber"><div class="flex flex-col sm:flex-row sm:items-center gap-5">'
     + '<div class="flex items-center gap-4"><div class="flex items-end gap-2.5">'
     + f'<div class="flex flex-col items-center gap-1.5"><div class="{"w-8 h-8" if w_judge_label == "🏻絶好調" else "w-5 h-5"} rounded-full {"bg-green-400 shadow-[0_0_14px_rgba(34,197,94,.75)]" if w_judge_label == "🏻絶好調" else "bg-green-500/15 border border-green-500/20"}"></div><span class="text-[8px] {"text-green-400 font-black" if w_judge_label == "🏻絶好調" else "text-green-500/40 font-bold"}">絶好調</span></div>'
@@ -2267,10 +2267,10 @@ f"{score_diff_html}</div>\n"
     + f'<div class="flex flex-col items-center gap-1.5"><div class="{"w-8 h-8" if w_judge_label == "🔧要改善" else "w-5 h-5"} rounded-full {"bg-red-400 shadow-[0_0_14px_rgba(239,68,68,.75)]" if w_judge_label == "🔧要改善" else "bg-red-500/15 border border-red-500/20"}"></div><span class="text-[8px] {"text-red-400 font-black" if w_judge_label == "🔧要改善" else "text-red-500/40 font-bold"}">要改善</span></div>'
     + '</div><div class="w-px h-12 bg-ark-border"></div>'
     + f'<div><p class="text-2xl font-black {w_judge_text_c} leading-none">{w_judge_label}</p></div></div>'
-    + f'<div class="flex gap-3 sm:ml-auto"><div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-[9px] text-ark-muted mb-1">体重平均</p><p class="text-base font-black text-white">' + str(w_weight_avg) + '<span class="text-xs font-normal text-ark-muted">kg</span></p></div>'
-    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-[9px] text-ark-muted mb-1">睡眠平均</p><p class="text-base font-black text-amber-300">' + str(w_sleep_avg) + '<span class="text-xs font-normal">h</span></p></div>'
-    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[70px]"><p class="text-[9px] text-ark-muted mb-1">体調</p><p class="text-base font-black text-white">' + w_cond_summary + '</p></div>'
-    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-[9px] text-ark-muted mb-1">総合</p><p class="text-base font-black ' + w_judge_text_c + '">' + str(w_score_total) + '<span class="text-xs font-normal text-ark-muted">点</span></p></div>'
+    + f'<div class="flex gap-3 sm:ml-auto"><div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-[9px] text-white/50 mb-1">体重平均</p><p class="text-base font-black text-white">' + str(w_weight_avg) + '<span class="text-xs font-normal text-ark-muted">kg</span></p></div>'
+    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-[9px] text-white/50 mb-1">睡眠平均</p><p class="text-base font-black text-amber-300">' + str(w_sleep_avg) + '<span class="text-xs font-normal">h</span></p></div>'
+    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[70px]"><p class="text-[9px] text-white/50 mb-1">体調</p><p class="text-base font-black text-white">' + w_cond_summary + '</p></div>'
+    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-[9px] text-white/50 mb-1">総合</p><p class="text-base font-black ' + w_judge_text_c + '">' + str(w_score_total) + '<span class="text-xs font-normal text-ark-muted">点</span></p></div>'
     + '</div></div></div></section>'
     + '<div class="grid grid-cols-1 md:grid-cols-2 gap-5"><div class="flex flex-col gap-3">'
     + weekly_cards_html
@@ -2279,7 +2279,7 @@ f"{score_diff_html}</div>\n"
     + '</div></div></div>'
 
     + '<div id="monthly-view" style="display:none" class="flex flex-col gap-5">'
-    + f'<section><div class="flex items-baseline gap-3 mb-2"><span class="text-[10px] font-bold text-ark-muted tracking-[.2em] uppercase">Monthly Condition</span><span class="text-[10px] text-ark-muted">{m_period}</span></div>'
+    + f'<section><div class="flex items-baseline gap-3 mb-2"><span class="text-[10px] font-bold text-white/50 tracking-[.2em] uppercase">Monthly Condition</span><span class="text-[10px] text-white/50">{m_period}</span></div>'
     + f'<div class="bg-ark-card border ' + m_judge_border + ' rounded-2xl p-5 glow-amber"><div class="flex flex-col sm:flex-row sm:items-center gap-5">'
     + '<div class="flex items-center gap-4"><div class="flex items-end gap-2.5">'
     + f'<div class="flex flex-col items-center gap-1.5"><div class="{"w-8 h-8" if m_judge_label == "🏅絶好調" else "w-5 h-5"} rounded-full {"bg-green-400 shadow-[0_0_14px_rgba(34,197,94,.75)]" if m_judge_label == "🏅絶好調" else "bg-green-500/15 border border-green-500/20"}"></div><span class="text-[8px] {"text-green-400 font-black" if m_judge_label == "🏅絶好調" else "text-green-500/40 font-bold"}">絶好調</span></div>'
@@ -2287,10 +2287,10 @@ f"{score_diff_html}</div>\n"
     + f'<div class="flex flex-col items-center gap-1.5"><div class="{"w-8 h-8" if m_judge_label == "🔄要改善" else "w-5 h-5"} rounded-full {"bg-red-400 shadow-[0_0_14px_rgba(239,68,68,.75)]" if m_judge_label == "🔄要改善" else "bg-red-500/15 border border-red-500/20"}"></div><span class="text-[8px] {"text-red-400 font-black" if m_judge_label == "🔄要改善" else "text-red-500/40 font-bold"}">要改善</span></div>'
     + '</div><div class="w-px h-12 bg-ark-border"></div>'
     + f'<div><p class="text-2xl font-black {m_judge_text_c} leading-none">{m_judge_label}</p></div></div>'
-    + f'<div class="flex gap-3 sm:ml-auto"><div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-[9px] text-ark-muted mb-1">体重平均</p><p class="text-base font-black text-white">' + str(m_weight_avg) + '<span class="text-xs font-normal text-ark-muted">kg</span></p></div>'
-    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-[9px] text-ark-muted mb-1">睡眠平均</p><p class="text-base font-black text-amber-300">' + str(m_sleep_avg) + '<span class="text-xs font-normal">h</span></p></div>'
-    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[70px]"><p class="text-[9px] text-ark-muted mb-1">体調</p><p class="text-base font-black text-white">' + m_cond_summary + '</p></div>'
-    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-[9px] text-ark-muted mb-1">総合</p><p class="text-base font-black ' + m_judge_text_c + '">' + str(m_score_total) + '<span class="text-xs font-normal text-ark-muted">点</span></p></div>'
+    + f'<div class="flex gap-3 sm:ml-auto"><div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-[9px] text-white/50 mb-1">体重平均</p><p class="text-base font-black text-white">' + str(m_weight_avg) + '<span class="text-xs font-normal text-ark-muted">kg</span></p></div>'
+    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-[9px] text-white/50 mb-1">睡眠平均</p><p class="text-base font-black text-amber-300">' + str(m_sleep_avg) + '<span class="text-xs font-normal">h</span></p></div>'
+    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[70px]"><p class="text-[9px] text-white/50 mb-1">体調</p><p class="text-base font-black text-white">' + m_cond_summary + '</p></div>'
+    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-[9px] text-white/50 mb-1">総合</p><p class="text-base font-black ' + m_judge_text_c + '">' + str(m_score_total) + '<span class="text-xs font-normal text-ark-muted">点</span></p></div>'
     + '</div></div></div></section>'
     + '<div class="grid grid-cols-1 md:grid-cols-2 gap-5"><div class="flex flex-col gap-3">'
     + monthly_cards_html
