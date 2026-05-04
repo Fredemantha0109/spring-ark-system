@@ -396,7 +396,7 @@ def training_summary_html(sessions, period_label):
     for s in sessions:
         shumoku = s.get("種目","")
         jisseki = s.get("実績")
-        if shumoku and jisseki:
+        if shumoku and jisseki is not None:
             if shumoku not in best or jisseki > best[shumoku]["実績"]:
                 best[shumoku] = s
     if not best:
@@ -1493,7 +1493,7 @@ def generate_weekly_comment(
         res = requests.post(
             "https://api.anthropic.com/v1/messages",
             headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 2000, "messages": [{"role": "user", "content": prompt}]},
+            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 3000, "messages": [{"role": "user", "content": prompt}]},
             timeout=30,
         )
         text = res.json()["content"][0]["text"].strip()
