@@ -814,10 +814,10 @@ def diff_label(current, baseline, unit, decimals=1):
     diff = round(current - baseline, decimals)
     if diff > 0:
         color = "text-red-400" if unit == "kg" else "text-green-400"
-        return f'<span class="text-[9px] {color} font-bold block mt-0.5">▲{diff}{unit}</span>'
+        return f'<span class="text-[9px] {color} font-bold block mt-0.5">+{diff}{unit}</span>'
     elif diff < 0:
         color = "text-green-400" if unit == "kg" else "text-red-400"
-        return f'<span class="text-[9px] {color} font-bold block mt-0.5">▼{abs(diff)}{unit}</span>'
+        return f'<span class="text-[9px] {color} font-bold block mt-0.5">▲{abs(diff)}{unit}</span>'
     else:
         return f'<span class="text-[9px] text-white/30 font-bold block mt-0.5">±0{unit}</span>'
 
@@ -895,7 +895,7 @@ if last_done:
 # ── タスク行HTML生成 ──────────────────────────────
 def task_rows_html(plan_tasks, done_tasks):
     if not plan_tasks:
-        return '<p class="text-xs italic py-1" style="color:rgba(74,90,114,0.7)">本日タスクなし</p>'
+        return '<p class="text-xs italic py-1" style="color:rgba(74,90,114,0.7)">前日タスクなし</p>'
     items = []
     for task in plan_tasks:
         done = task in done_tasks
@@ -937,7 +937,7 @@ def category_card(name, subtitle, icon_svg, color, score, plan_tasks, done_tasks
         '</div>'
         '<div>'
         '<p class="text-xs font-black ' + text_c + ' tracking-[.15em]">' + name + '</p>'
-        '<p class="text-xs text-ark-muted">' + subtitle + '</p>'
+        '<p class="text-xs text-white/50">' + subtitle + '</p>'
         '</div></div>'
         '<p class="text-xl font-black ' + text_c + '">' + str(score)
         + '<span class="text-sm text-ark-muted font-normal">/100点</span></p>'
@@ -1136,7 +1136,7 @@ def majority_load(date_list, suffix):
     return (
         f'<div class="inline-flex items-center gap-1.5 {bc} rounded-full px-3 py-1.5 ml-2">'
         f'<div class="w-1.5 h-1.5 rounded-full bg-{color}-400 animate-pulse-slow"></div>'
-        f'<span class="text-[11px] font-bold {tc}">{label}</span>'
+        f'<span class="text-sm font-bold {tc}">{label}</span>'
         f'</div>'
     )
 
@@ -1149,7 +1149,7 @@ load_text_c, load_badge_cls = load_color_map[load_color]
 load_badge_html = (
     f'<div class="inline-flex items-center gap-1.5 {load_badge_cls} rounded-full px-3 py-1.5 ml-2">'
     f'<div class="w-1.5 h-1.5 rounded-full bg-{load_color}-400 animate-pulse-slow"></div>'
-    f'<span class="text-[11px] font-bold {load_text_c}">{load_label}</span>'
+    f'<span class="text-sm font-bold {load_text_c}">{load_label}</span>'
     f'</div>'
 )
 
@@ -1443,11 +1443,11 @@ sleep_diff_html  = diff_label(sleep,  w_sleep_avg,  "h")
 
 score_diff = round(score_total - w_score_total) if w_score_total else 0
 if score_diff > 0:
-    score_diff_html = f'<span class="text-[9px] text-green-400 font-bold block mt-0.5">▲{score_diff}</span>'
+    score_diff_html = f'<span class="text-[9px] text-green-400 font-bold block mt-0.5">+{score_diff}点</span>'
 elif score_diff < 0:
-    score_diff_html = f'<span class="text-[9px] text-red-400 font-bold block mt-0.5">▼{abs(score_diff)}</span>'
+    score_diff_html = f'<span class="text-[9px] text-red-400 font-bold block mt-0.5">▲{abs(score_diff)}点</span>'
 else:
-    score_diff_html = f'<span class="text-[9px] text-white/30 font-bold block mt-0.5">±0</span>'
+    score_diff_html = f'<span class="text-[9px] text-white/30 font-bold block mt-0.5">±0点</span>'
 
 
 # ── ▼ ジャーナリングデータ取得（Weekly・Monthly）─────
@@ -2105,7 +2105,7 @@ html = (
     "        <h1 class=\"text-2xl font-black tracking-tight\">SPRING ARK</h1>\n"
     "<div class=\"inline-flex bg-ark-dim rounded-full p-0.5 gap-0.5\"><button id=\"tab-daily\" onclick=\"switchTab('daily')\" class=\"tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border\">Daily</button><button id=\"tab-weekly\" onclick=\"switchTab('weekly')\" class=\"tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted\">Weekly</button><button id=\"tab-monthly\" onclick=\"switchTab('monthly')\" class=\"tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted\">Monthly</button></div>\n"
     "      </div>\n"
-    f"      <p class=\"text-xs text-ark-muted\">{header_date}</p>\n"
+    f"      <p class=\"text-xs text-white/50\">{header_date}</p>\n"
     "    </div>\n"
     + '<div id="badge-daily">' + load_badge_html + '</div>'
     + '<div id="badge-weekly" style="display:none">' + w_badge_html + '</div>'
