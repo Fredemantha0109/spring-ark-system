@@ -969,7 +969,7 @@ if ai_strategies:
             '</div>'
         )
     strategy_html = (
-        '<div class="bg-ark-card border border-violet-500/15 rounded-2xl p-4 mt-4">' +
+        '<div class="bg-ark-card border border-violet-500/15 rounded-2xl p-4">' +
         '<div class="flex items-center gap-2 mb-3">' +
         '<svg class="w-4 h-4 text-violet-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>' +
         '<p class="text-[10px] font-black text-violet-400 tracking-[.15em]">今日の推奨作戦</p>' +
@@ -1806,13 +1806,13 @@ if monthly_summaries or monthly_analysis:
         'AI分析</button>'
         '<button id="m-tab-english" onclick="switchMTab(\'english\')" '
         'class="m-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted">'
-        '📊 英語分析</button>'
+        '📊 英語</button>'
         '<button id="m-tab-journal" onclick="switchMTab(\'journal\')" '
         'class="m-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted">'
-        '🔒 ジャーナリング</button>'
+        '🔒 Journal</button>'
         '<button id="m-tab-training" onclick="switchMTab(\'training\')" '
         'class="m-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted">'
-        '💪 トレーニング</button>'
+        '💪 筋トレ</button>'
         '</div></div>'
         '<div id="m-panel-score">' + m_score_panel + '</div>'
         '<div id="m-panel-english" style="display:none">' + m_english_panel_html + '</div>'
@@ -1923,13 +1923,13 @@ if weekly_summaries or weekly_analysis:
         'AI分析</button>'
         '<button id="w-tab-english" onclick="switchWTab(\'english\')" '
         'class="w-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted">'
-        '📊 英語分析</button>'
+        '📊 英語</button>'
         '<button id="w-tab-journal" onclick="switchWTab(\'journal\')" '
         'class="w-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted">'
-        '🔒 ジャーナリング</button>'
+        '🔒 Journal</button>'
         '<button id="w-tab-training" onclick="switchWTab(\'training\')" '
         'class="w-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted">'
-        '💪 トレーニング</button>'
+        '💪 筋トレ</button>'
         '</div></div>'
         '<div id="w-panel-score">' + score_panel + '</div>'
         '<div id="w-panel-english" style="display:none">' + w_english_panel_html + '</div>'
@@ -2140,6 +2140,7 @@ html = (
     + today_training_html +
     "    </div>\n"
     "    <div class=\"flex flex-col gap-4\">\n"
+    + strategy_html          # ← 最上部に移動（カレンダーより前）
     + calendar_html +
     "      <div class=\"stripe bg-ark-card border border-violet-500/20 rounded-2xl p-4 glow-violet flex-1\">\n"
     "        <div class=\"flex items-center gap-2 mb-5\">\n"
@@ -2159,7 +2160,6 @@ html = (
     "        </div>\n"
     "        <div class=\"flex flex-col gap-2\">\n"
     + ai_section_inner
-    + strategy_html
     + system_trigger_html
     + priority_candidates_html +
     "\n        </div>\n"
