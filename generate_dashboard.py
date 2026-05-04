@@ -301,7 +301,7 @@ def fetch_training_data(target_date_str):
                 "回数":    p.get("回数", {}).get("number"),
                 "セット数": p.get("セット数", {}).get("number"),
             })
-        return [s for s in sessions if s["種目"]]
+        return [s for s in sessions if s.get("種目", "")]
     except Exception as e:
         print(f"[WARN] Training fetch error: {e}")
         return []
@@ -336,7 +336,7 @@ def fetch_training_period(start_str, end_str):
                 "セット数": p.get("セット数", {}).get("number"),
             })
         print(f"[DEBUG] training sessions all: {len(sessions)} filtered: {len([s for s in sessions if s[chr(31310)+chr(30446)]])} start={start_str}")
-        return sorted([s for s in sessions if s["種目"]], key=lambda x: x["日付"])
+        return sorted([s for s in sessions if s.get("種目", "")], key=lambda x: x["日付"])
     except Exception as e:
         print(f"[WARN] Training period fetch error: {e}")
         return []
