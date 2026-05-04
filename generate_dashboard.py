@@ -340,8 +340,6 @@ def fetch_training_period(start_str, end_str):
             })
         filtered = sorted([s for s in sessions if s.get("種目", "")], key=lambda x: x["日付"])
         print(f"[OK] トレーニング取得: {len(filtered)}件 ({start_str}〜{end_str})")
-        for s in filtered:
-            print(f"[DEBUG] {s['日付']} {s['種目']} 実績={s['実績']} type={type(s['実績'])}")
         return filtered
     except Exception as e:
         print(f"[WARN] Training period fetch error: {e}")
@@ -1456,7 +1454,6 @@ monthly_training = fetch_training_period(_last_month_start.strftime("%Y-%m-%d"),
 today_training_html   = training_card_html(today_training,  "YESTERDAY'S TRAINING")
 weekly_training_html  = training_summary_html(weekly_training,  "WEEKLY")
 monthly_training_html = generate_monthly_training_analysis(monthly_training)
-print(f"[DEBUG] monthly_training_html length={len(monthly_training_html)}, preview={monthly_training_html[:80]}")
 # ── ▲ トレーニングデータ取得ここまで ─────────────
 
 # ── ▼ 英語学習データ取得 ─────────────────────────
@@ -1722,7 +1719,6 @@ m_english_panel_html = make_english_panel_html(
 )
 # ── ▲ 英語分析パネルHTML ここまで ──────────────────
 
-print("[INFO] Monthly AI分析開始...")
 monthly_summaries, monthly_analysis = generate_monthly_comment(
     m_score_w, m_score_c, m_score_ca, m_score_i, m_score_total,
     m_weight_avg, m_sleep_avg, m_cond_summary, m_task_done_count,
