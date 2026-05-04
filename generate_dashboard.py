@@ -971,7 +971,14 @@ if ai_note:
             )
     ai_html = "\n".join(items)
 
-ai_section_inner = ai_html if ai_html else '<p class="text-xs text-ark-muted text-center py-4">昨日の未達タスクなし 🎉</p>'
+agent_comment_html = (
+    f'<div class="bg-ark-dim/40 border border-violet-500/15 rounded-xl px-3 py-2.5 mb-2">'
+    f'<p class="text-xs text-white/80 leading-relaxed">{agent_comment}</p>'
+    f'</div>'
+) if agent_comment else ""
+
+missed_html = ai_html if ai_html else '<p class="text-xs text-ark-muted text-center py-2">昨日の未達タスクなし 🎉</p>'
+ai_section_inner = agent_comment_html + missed_html
 
 
 
@@ -1132,6 +1139,42 @@ load_badge_html = (
     f'</div>'
 )
 
+# ── AI Agent 分析コメント生成 ──────────────────────
+def generate_agent_comment(sleep_val, cond, judge, scores, missed_tasks, weight_val, cal_events):
+    if not ANTHROPIC_API_KEY:
+        return ""
+    missed_str = "\n".join([f"・{cat}: {task}" for task, cat in missed_tasks]) or "なし"
+    cal_str = "\n".join([f"・{ev['start']} {ev['name']}" for ev in cal_events]) if cal_events else "なし"
+    score_str = f"W:{scores[0]} / C:{scores[1]} / Ca:{scores[2]} / I:{scores[3]}"
+    prompt = (
+        "あなたはSpring Arkのパーソナルコーチです。\n"
+        "以下のデータをもとに、今日のコンディションと状況を踏まえた分析コメントを2〜3文で出力してください。\n"
+        "JSONではなく自然な日本語テキストのみ出力してください。\n\n"
+        f"- 睡眠: {sleep_val}h / 体調: {cond} / 体重: {weight_val}kg / 判定: {judge}\n"
+        f"- スコア: {score_str}\n"
+        f"- 昨日の未達タスク: {missed_str}\n"
+        f"- 今日のカレンダー: {cal_str}\n"
+    )
+    try:
+        res = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 200, "messages": [{"role": "user", "content": prompt}]},
+            timeout=15,
+        )
+        return res.json()["content"][0]["text"].strip()
+    except Exception as e:
+        print(f"[WARN] Agent comment error: {e}")
+        return ""
+
+agent_comment = generate_agent_comment(
+    sleep, condition, judge_label,
+    [score_w, score_c, score_ca, score_i],
+    missed_tasks_all[:8],
+    weight,
+    calendar_events
+)
+
 ai_strategies = generate_strategy(
     sleep, condition, judge_label,
     [score_w, score_c, score_ca, score_i],
@@ -1148,7 +1191,7 @@ if ai_strategies:
             '<div class="flex items-start gap-3 bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">' +
             '<span class="w-5 h-5 rounded-full bg-violet-500/25 border border-violet-500/35 text-[9px] font-black text-violet-300 flex items-center justify-center flex-shrink-0 mt-0.5">' + str(i) + '</span>' +
             '<div><p class="text-xs font-black text-white">' + s.get("title", "") + '</p>' +
-            '<p class="text-[10px] text-ark-muted mt-0.5">' + s.get("detail", "") + '</p></div>' +
+            '<p class="text-[10px] text-white/50 mt-0.5">' + s.get("detail", "") + '</p></div>' +
             '</div>'
         )
     strategy_html = (
@@ -1217,8 +1260,7 @@ def make_candidate_card(rank, task_name, category, reason, gh_pat, gh_repo):
         f'<span class="text-[9px] font-black {text_c} {badge_cls} border rounded px-1.5 py-0.5">{cat_label}</span>'
         f'</div>'
         f'<p class="text-sm font-black text-white truncate">{task_name}</p>'
-        f'<p class="text-[9px] text-ark-muted mt-0.5">{reason}</p>'
-        f'</div>'
+        f'<p class="text-[9px] text-white/50 mt-0.5">{reason}</p>'        f'</div>'
         f'<button onclick="{fn}()" class="flex-shrink-0 bg-violet-500/15 hover:bg-violet-500/30 border border-violet-500/30 text-violet-300 text-[10px] font-black rounded-lg px-3 py-1.5 transition-all cursor-pointer">'
         f'⚡ 優先設定</button>'
         f'</div></div>'
@@ -2124,7 +2166,7 @@ html = (
     + '<div id="daily-view">'
 
     "\n  <section>\n"
-    "    <span class=\"text-[10px] font-bold text-ark-muted tracking-[.2em] uppercase block mb-2\">Today's Condition</span>\n"
+    "    <span class=\"text-[10px] font-bold text-white/50 tracking-[.2em] uppercase block mb-2\">Today's Condition</span>\n"
     f"    <div class=\"bg-ark-card border {judge_border} rounded-2xl p-5 glow-amber\">\n"
     "      <div class=\"flex flex-col sm:flex-row sm:items-center gap-5\">\n"
     "        <div class=\"flex items-center gap-4\">\n"
@@ -2149,21 +2191,21 @@ html = (
     "        </div>\n"
     "        <div class=\"flex gap-3 sm:ml-auto\">\n"
     f"          <div class=\"bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]\">"
-f"<p class=\"text-xs text-ark-muted mb-1\">体重</p>"
+f"<p class=\"text-xs text-white/50 mb-1\">体重</p>"
 f"<p class=\"text-xl font-black text-white\">{weight}<span class=\"text-xs font-normal text-ark-muted\">kg</span></p>"
 f"{weight_diff_html}</div>\n"
 
 f"          <div class=\"bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]\">"
-f"<p class=\"text-xs text-ark-muted mb-1\">睡眠</p>"
+f"<p class=\"text-xs text-white/50 mb-1\">睡眠</p>"
 f"<p class=\"text-xl font-black {sleep_c}\">{sleep}<span class=\"text-xs font-normal\">h</span></p>"
 f"{sleep_diff_html}</div>\n"
 
 f"          <div class=\"bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]\">"
-f"<p class=\"text-xs text-ark-muted mb-1\">体調</p>"
+f"<p class=\"text-xs text-white/50 mb-1\">体調</p>"
 f"<p class=\"text-xl font-black {cond_text_c}\">{condition}</p></div>\n"
 
 f"          <div class=\"bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]\">"
-f"<p class=\"text-xs text-ark-muted mb-1\">総合</p>"
+f"<p class=\"text-xs text-white/50 mb-1\">総合</p>"
 f"<p class=\"text-xl font-black {judge_text_c}\">{score_total}<span class=\"text-xs font-normal text-ark-muted\">点</span></p>"
 f"{score_diff_html}</div>\n"
     "        </div>\n"
