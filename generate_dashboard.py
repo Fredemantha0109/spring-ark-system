@@ -1136,7 +1136,6 @@ def majority_load(date_list, suffix):
     label = f"{emoji} {top_key}{suffix}"
     return (
         f'<div class="inline-flex items-center gap-1.5 {bc} rounded-full px-3 py-1.5 ml-2">'
-        f'<div class="w-1.5 h-1.5 rounded-full bg-{color}-400 animate-pulse-slow"></div>'
         f'<span class="text-sm font-bold {tc}">{label}</span>'
         f'</div>'
     )
