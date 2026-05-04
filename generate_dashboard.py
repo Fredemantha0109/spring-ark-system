@@ -806,6 +806,21 @@ def calc_judge(sleep_val, cond):
 
 judge_label, judge_color = calc_judge(sleep, condition)
 
+# ── 先週比の差分計算 ────────────────────────────
+def diff_label(current, baseline, unit, decimals=1):
+    """現在値と基準値の差分をHTMLで返す"""
+    if current == "-" or baseline == "-":
+        return ""
+    diff = round(current - baseline, decimals)
+    if diff > 0:
+        color = "text-red-400" if unit == "kg" else "text-green-400"
+        return f'<span class="text-[9px] {color} font-bold block mt-0.5">▲{diff}{unit}</span>'
+    elif diff < 0:
+        color = "text-green-400" if unit == "kg" else "text-red-400"
+        return f'<span class="text-[9px] {color} font-bold block mt-0.5">▼{abs(diff)}{unit}</span>'
+    else:
+        return f'<span class="text-[9px] text-white/30 font-bold block mt-0.5">±0{unit}</span>'
+
 ai_note = ""
 ai_strategies = generate_strategy(
     sleep, condition, judge_label,
@@ -1422,6 +1437,17 @@ m_judge_text_c, m_judge_border = m_judge_colors[m_judge_color]
 
 w_badge_html = majority_load([d for d, _ in weekly_pages], "週")
 m_badge_html = majority_load([d for d, _ in monthly_pages], "月")
+
+weight_diff_html = diff_label(weight, w_weight_avg, "kg")
+sleep_diff_html  = diff_label(sleep,  w_sleep_avg,  "h")
+
+score_diff = round(score_total - w_score_total) if w_score_total else 0
+if score_diff > 0:
+    score_diff_html = f'<span class="text-[9px] text-green-400 font-bold block mt-0.5">▲{score_diff}</span>'
+elif score_diff < 0:
+    score_diff_html = f'<span class="text-[9px] text-red-400 font-bold block mt-0.5">▼{abs(score_diff)}</span>'
+else:
+    score_diff_html = f'<span class="text-[9px] text-white/30 font-bold block mt-0.5">±0</span>'
 
 
 # ── ▼ ジャーナリングデータ取得（Weekly・Monthly）─────
@@ -2113,22 +2139,24 @@ html = (
     "          </div>\n"
     "        </div>\n"
     "        <div class=\"flex gap-3 sm:ml-auto\">\n"
-    "          <div class=\"bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]\">\n"
-    "            <p class=\"text-xs text-ark-muted mb-1\">体重</p>\n"
-    f"            <p class=\"text-xl font-black text-white\">{weight}<span class=\"text-xs font-normal text-ark-muted\">kg</span></p>\n"
-    "          </div>\n"
-    "          <div class=\"bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]\">\n"
-    "            <p class=\"text-xs text-ark-muted mb-1\">睡眠</p>\n"
-    f"            <p class=\"text-xl font-black {sleep_c}\">{sleep}<span class=\"text-xs font-normal\">h</span></p>\n"
-    "          </div>\n"
-    "          <div class=\"bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]\">\n"
-    "            <p class=\"text-xs text-ark-muted mb-1\">体調</p>\n"
-    f"            <p class=\"text-xl font-black {cond_text_c}\">{condition}</p>\n"
-    "          </div>\n"
-    "          <div class=\"bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]\">\n"
-    "            <p class=\"text-xs text-ark-muted mb-1\">総合</p>\n"
-    f"            <p class=\"text-xl font-black {judge_text_c}\">{score_total}<span class=\"text-xs font-normal text-ark-muted\">点</span></p>\n"
-    "          </div>\n"
+    f"          <div class=\"bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]\">"
+f"<p class=\"text-xs text-ark-muted mb-1\">体重</p>"
+f"<p class=\"text-xl font-black text-white\">{weight}<span class=\"text-xs font-normal text-ark-muted\">kg</span></p>"
+f"{weight_diff_html}</div>\n"
+
+f"          <div class=\"bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]\">"
+f"<p class=\"text-xs text-ark-muted mb-1\">睡眠</p>"
+f"<p class=\"text-xl font-black {sleep_c}\">{sleep}<span class=\"text-xs font-normal\">h</span></p>"
+f"{sleep_diff_html}</div>\n"
+
+f"          <div class=\"bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]\">"
+f"<p class=\"text-xs text-ark-muted mb-1\">体調</p>"
+f"<p class=\"text-xl font-black {cond_text_c}\">{condition}</p></div>\n"
+
+f"          <div class=\"bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]\">"
+f"<p class=\"text-xs text-ark-muted mb-1\">総合</p>"
+f"<p class=\"text-xl font-black {judge_text_c}\">{score_total}<span class=\"text-xs font-normal text-ark-muted\">点</span></p>"
+f"{score_diff_html}</div>\n"
     "        </div>\n"
     "      </div>\n"
     "    </div>\n"
