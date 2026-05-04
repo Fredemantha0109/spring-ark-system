@@ -335,7 +335,7 @@ def fetch_training_period(start_str, end_str):
                 "種目":    shumoku,
                 "目標":    p.get("目標", {}).get("number"),
                 "実績":    p.get("実績", {}).get("number"),
-  ト数", {}).get("number"),
+                "セット数": p.get("セット数", {}).get("number"),
                 "ひとこと": hitokoto,
             })
         filtered = sorted([s for s in sessions if s.get("種目", "")], key=lambda x: x["日付"])
@@ -427,8 +427,10 @@ def generate_monthly_training_analysis(sessions):
         jisseki = s.get("実績")
         hitokoto = s.get("ひとこと", "")
         if shumoku:
-            w = f"{jisseki}kg(目標{mokuhyo}kg)" if jisseki and mokuhyo else f"{jisseki}kg"       lines.append(f"{s.get('日付','')} {shumoku} {w}{memo}")
-    if notes or not ANTHROPIC_API_KEY:
+            w = f"{jisseki}kg(目標{mokuhyo}kg)" if jisseki and mokuhyo else f"{jisseki}kg" if jisseki else ""
+            memo = f" /{hitokoto}" if hitokoto else ""
+            lines.append(f"{s.get('日付','')} {shumoku} {w}{memo}")
+    if not lines or not ANTHROPIC_API_KEY:
         return '<p style="font-size:12px;color:rgba(74,90,114,0.7);text-align:center;padding:1rem">データなし</p>'
     data_str = "\n".join(lines)
     prompt = (
@@ -445,21 +447,28 @@ def generate_monthly_training_analysis(sessions):
             json={"model": "claude-haiku-4-5-20251001", "max_tokens": 400, "messages": [{"role": "user", "content": prompt}]},
             timeout=20,
         )
-        text = res.json()["label, color, key in [("先月の成長","#a78bfa","growth"),("課題","#a78bfa","challenge"),("来月への提案","#2dd4bf","next")]:
-                val = str(p.get(key,"")).strip()[:100]
+        text = res.json()["content"][0]["text"].strip()
+        s, e = text.find("{"), text.rfind("}") + 1
+        if s >= 0 and e > s:
+            parsed = _j.loads(text[s:e])
+            items = []
+            for label, color, key in [("先月の成長", "#a78bfa", "growth"), ("課題", "#a78bfa", "challenge"), ("来月への提案", "#2dd4bf", "next")]:
+                val = str(parsed.get(key, "")).strip()[:100]
                 if val:
                     items.append(
-                        f'<div style="background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.2);border-radius:0.75rem;padding:0.75rem">' +
-                        f'<p style="font-size:9px;font-weight:900;color:{color};margin-bottom:4px">{label}</p>' +
+                        f'<div style="background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.2);border-radius:0.75rem;padding:0.75rem">'
+                        f'<p style="font-size:9px;font-weight:900;color:{color};margin-bottom:4px">{label}</p>'
                         f'<p style="font-size:12px;color:rgba(255,255,255,0.8);line-height:1.6">{val}</p></div>'
                     )
             if items:
                 return (
-                    '<div style="display:flex;flex-direction:column;gap:0.5rem">' +
-                    '<p style="font-size:10px;font-weight:900;color:#a78bfa;letter-spacing:.15em;margin-bottom:4px">TRAINING MONTHLY ANALYSIS</p>' +
-                    "\n".join(items) + '</div>'
+                    '<div style="display:flex;flex-direction:column;gap:0.5rem">'
+                    '<p style="font-size:10px;font-weight:900;color:#a78bfa;letter-spacing:.15em;margin-bottom:4px">TRAINING MONTHLY ANALYSIS</p>'
+                    + "\n".join(items)
+                    + '</div>'
                 )
-    except Exnt(f"[WARN] Training analysis error: {ex}")
+    except Exception as ex:
+        print(f"[WARN] Training analysis error: {ex}")
     return '<p style="font-size:12px;color:rgba(74,90,114,0.7);text-align:center;padding:1rem">分析エラー</p>'
 
 # ── ▲ トレーニングログ取得ユーティリティ ここまで ───
