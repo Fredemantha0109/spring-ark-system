@@ -734,10 +734,10 @@ def generate_strategy(sleep_val, cond, judge, scores, missed_tasks, weight_val="
         return []
     missed_str = "\n".join([f"・{cat}: {task}" for task, cat in missed_tasks]) or "なし"
     cal_events = calendar_events or []
-if cal_events:
-    cal_str = "\n".join([f"・{ev['start']} {ev['name']}" for ev in cal_events])
-else:
-    cal_str = "なし"
+    if cal_events:
+        cal_str = "\n".join([f"・{ev['start']} {ev['name']}" for ev in cal_events])
+    else:
+        cal_str = "なし"
     score_str  = f"W:{scores[0]} / C:{scores[1]} / Ca:{scores[2]} / I:{scores[3]}"
     prompt = (
         "あなたはSpring Arkプロジェクトのパーソナルコーチです。\n"
@@ -828,13 +828,7 @@ def diff_label(current, baseline, unit, decimals=1):
         return f'<span class="text-[9px] text-white/30 font-bold block mt-0.5">±0{unit}</span>'
 
 ai_note = ""
-ai_strategies = generate_strategy(
-    sleep, condition, judge_label,
-    [score_w, score_c, score_ca, score_i],
-    missed_tasks_all[:8],
-    weight_val=weight,
-    calendar_events=calendar_events
-)
+
 
 # ── 過去5日間の優先タスク候補を集計 ──────────────────
 CATEGORIES = {
@@ -1160,6 +1154,13 @@ load_badge_html = (
     f'</div>'
 )
 
+ai_strategies = generate_strategy(
+    sleep, condition, judge_label,
+    [score_w, score_c, score_ca, score_i],
+    missed_tasks_all[:8],
+    weight_val=weight,
+    calendar_events=calendar_events
+)
 system_trigger_html = ""
 if judge_label == "危険":
     system_trigger_html = (
@@ -2211,7 +2212,7 @@ f"{score_diff_html}</div>\n"
     "\n        </div>\n"
     "      </div>\n"
     + strategy_html
-+ priority_candidates_html
++ priority_candidates_html +
     "    </div>\n"
     "  </div>\n"
     + '</div>'
