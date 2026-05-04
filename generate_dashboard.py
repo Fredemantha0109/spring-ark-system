@@ -729,10 +729,15 @@ def validate_weekly_monthly(parsed):
         analysis = analysis[:600]
     return validated_summaries, analysis
 
-def generate_strategy(sleep_val, cond, judge, scores, missed_tasks, weight_val="-"):
+def generate_strategy(sleep_val, cond, judge, scores, missed_tasks, weight_val="-", calendar_events=None):
     if not ANTHROPIC_API_KEY:
         return []
     missed_str = "\n".join([f"・{cat}: {task}" for task, cat in missed_tasks]) or "なし"
+    cal_events = calendar_events or []
+if cal_events:
+    cal_str = "\n".join([f"・{ev['start']} {ev['name']}" for ev in cal_events])
+else:
+    cal_str = "なし"
     score_str  = f"W:{scores[0]} / C:{scores[1]} / Ca:{scores[2]} / I:{scores[3]}"
     prompt = (
         "あなたはSpring Arkプロジェクトのパーソナルコーチです。\n"
@@ -744,6 +749,7 @@ def generate_strategy(sleep_val, cond, judge, scores, missed_tasks, weight_val="
         f"- 総合判定: {judge}\n"
         f"- スコア: {score_str}\n\n"
         f"【昨日の未達タスク】\n{missed_str}\n\n"
+        f"【今日のカレンダー】\n{cal_str}\n\n"
         "【出力形式】必ずJSON配列のみ出力してください。他のテキストは一切不要。\n"
         '[\n'
         '  {"title": "作戦タイトル(15文字以内)", "detail": "具体的な行動(30文字以内)"},\n'
@@ -826,7 +832,8 @@ ai_strategies = generate_strategy(
     sleep, condition, judge_label,
     [score_w, score_c, score_ca, score_i],
     missed_tasks_all[:8],
-    weight_val=weight
+    weight_val=weight,
+    calendar_events=calendar_events
 )
 
 # ── 過去5日間の優先タスク候補を集計 ──────────────────
@@ -1054,7 +1061,7 @@ if calendar_events:
             f'</div>'
         )
     calendar_html = (
-        '<div id="calendar" class="bg-ark-card border border-sky-500/20 rounded-2xl p-4 mt-4">'
+        '<div id="calendar" class="bg-ark-card border border-sky-500/20 rounded-2xl p-4">'
         '<div class="flex items-center gap-2 mb-3">'
         '<svg class="w-4 h-4 text-sky-400 flex-shrink-0" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>'
         '<p class="text-[10px] font-black text-sky-400 tracking-[.15em]">TODAY\'S CALENDAR</p>'
@@ -2181,8 +2188,6 @@ f"{score_diff_html}</div>\n"
     + today_training_html +
     "    </div>\n"
     "    <div class=\"flex flex-col gap-4\">\n"
-+ strategy_html
-+ priority_candidates_html
 + calendar_html +
     "      <div id=\"agent\" class=\"stripe bg-ark-card border border-violet-500/20 rounded-2xl p-4 glow-violet flex-1\">\n"
     "        <div class=\"flex items-center gap-2 mb-5\">\n"
@@ -2205,6 +2210,8 @@ f"{score_diff_html}</div>\n"
     + system_trigger_html +
     "\n        </div>\n"
     "      </div>\n"
+    + strategy_html
++ priority_candidates_html
     "    </div>\n"
     "  </div>\n"
     + '</div>'
