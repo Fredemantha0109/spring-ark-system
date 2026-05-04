@@ -1149,7 +1149,6 @@ load_color_map = {
 load_text_c, load_badge_cls = load_color_map[load_color]
 load_badge_html = (
     f'<div class="inline-flex items-center gap-1.5 {load_badge_cls} rounded-full px-3 py-1.5 ml-2">'
-    f'<div class="w-1.5 h-1.5 rounded-full bg-{load_color}-400 animate-pulse-slow"></div>'
     f'<span class="text-sm font-bold {load_text_c}">{load_label}</span>'
     f'</div>'
 )
@@ -2211,7 +2210,7 @@ f"{score_diff_html}</div>\n"
     + system_trigger_html +
     "\n        </div>\n"
     "      </div>\n"
-    + strategy_html
+    + strategy_html +
 + priority_candidates_html +
     "    </div>\n"
     "  </div>\n"
