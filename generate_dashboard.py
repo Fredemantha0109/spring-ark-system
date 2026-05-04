@@ -1722,6 +1722,7 @@ m_english_panel_html = make_english_panel_html(
 )
 # ── ▲ 英語分析パネルHTML ここまで ──────────────────
 
+print("[INFO] Monthly AI分析開始...")
 monthly_summaries, monthly_analysis = generate_monthly_comment(
     m_score_w, m_score_c, m_score_ca, m_score_i, m_score_total,
     m_weight_avg, m_sleep_avg, m_cond_summary, m_task_done_count,
