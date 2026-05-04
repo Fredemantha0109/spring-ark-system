@@ -1774,6 +1774,7 @@ if monthly_summaries or monthly_analysis:
                     f'<div class="bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">'
                     f'<p class="text-[9px] font-black text-teal-400 mb-1">放電 / 充電</p>'
                     f'<p class="text-xs text-white/80 leading-relaxed">{e["charge_discharge"]}</p>'
+                    f'</div>'
                 )
             if e.get("needs_priority"):
                 mj_items.append(
