@@ -1161,7 +1161,7 @@ if ai_strategies:
         "\n".join(items_html) +
         '</div></div>'
     )
-    
+
 system_trigger_html = ""
 if judge_label == "危険":
     system_trigger_html = (
@@ -2212,8 +2212,8 @@ f"{score_diff_html}</div>\n"
     + system_trigger_html +
     "\n        </div>\n"
     "      </div>\n"
-    + strategy_html +
-+ priority_candidates_html +
+    + strategy_html 
+    + priority_candidates_html +
     "    </div>\n"
     "  </div>\n"
     + '</div>'
