@@ -301,7 +301,7 @@ def fetch_training_data(target_date_str):
                 "回数":    p.get("回数", {}).get("number"),
                 "セット数": p.get("セット数", {}).get("number"),
             })
-        return [s for s in sessions if s["種目"]]
+        return [s for s in sessions if s.get("種目", "")]
     except Exception as e:
         print(f"[WARN] Training fetch error: {e}")
         return []
@@ -336,7 +336,7 @@ def fetch_training_period(start_str, end_str):
                 "回数":    p.get("回数", {}).get("number"),
                 "セット数": p.get("セット数", {}).get("number"),
             })
-        return sorted([s for s in sessions if s["種目"]], key=lambda x: x["日付"])
+        return sorted([s for s in sessions if s.get("種目", "")], key=lambda x: x["日付"])
     except Exception as e:
         print(f"[WARN] Training period fetch error: {e}")
         return []
@@ -1573,7 +1573,7 @@ def generate_monthly_comment(
         res = requests.post(
             "https://api.anthropic.com/v1/messages",
             headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 2000, "messages": [{"role": "user", "content": prompt}]},
+            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 4000, "messages": [{"role": "user", "content": prompt}]},
             timeout=30,
         )
         text = res.json()["content"][0]["text"].strip()
