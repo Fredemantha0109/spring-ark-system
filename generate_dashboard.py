@@ -1819,7 +1819,7 @@ if monthly_summaries or monthly_analysis:
         '<div id="m-panel-score">' + m_score_panel + '</div>'
         '<div id="m-panel-english" style="display:none">' + m_english_panel_html + '</div>'
         '<div id="m-panel-journal" style="display:none">' + m_journal_panel + '</div>'
-        '<div id="m-panel-training" style="display:none"><div class="flex flex-col gap-2">' + monthly_training_html + '</div></div>'
+        '<div id="m-panel-training" style="display:none">' + monthly_training_html + '</div>'
         '</div>'
         '<script>'
         'function switchMTab(t){'
