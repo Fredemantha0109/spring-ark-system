@@ -328,13 +328,15 @@ def fetch_training_period(start_str, end_str):
             p = r.get("properties", {})
             shumoku_prop = p.get("種目", {}).get("select")
             shumoku = shumoku_prop.get("name", "") if isinstance(shumoku_prop, dict) else ""
+            hitokoto_items = p.get("ひとこと", {}).get("rich_text", [])
+            hitokoto = hitokoto_items[0].get("plain_text", "") if hitokoto_items else ""
             sessions.append({
                 "日付":    p.get("日付", {}).get("date", {}).get("start", ""),
                 "種目":    shumoku,
                 "目標":    p.get("目標", {}).get("number"),
                 "実績":    p.get("実績", {}).get("number"),
-                "回数":    p.get("回数", {}).get("number"),
-                "セット数": p.get("セット数", {}).get("number"),
+  ト数", {}).get("number"),
+                "ひとこと": hitokoto,
             })
         filtered = sorted([s for s in sessions if s.get("種目", "")], key=lambda x: x["日付"])
         print(f"[OK] トレーニング取得: {len(filtered)}件 ({start_str}〜{end_str})")
@@ -414,6 +416,52 @@ def training_summary_html(sessions, period_label):
         f'<p class="text-[10px] font-black text-violet-400 tracking-[.15em]">TRAINING {period_label} BEST</p>'
         '</div>' + rows + '</div>'
     )
+
+def generate_monthly_training_analysis(sessions):
+    if not sessions:
+        return '<p style="font-size:12px;color:rgba(74,90,114,0.7);text-align:center;padding:1rem">トレーニングデータがありません</p>'
+    lines = []
+    for s in sessions:
+        shumoku = s.get("種目", "")
+        mokuhyo = s.get("目標")
+        jisseki = s.get("実績")
+        hitokoto = s.get("ひとこと", "")
+        if shumoku:
+            w = f"{jisseki}kg(目標{mokuhyo}kg)" if jisseki and mokuhyo else f"{jisseki}kg"       lines.append(f"{s.get('日付','')} {shumoku} {w}{memo}")
+    if notes or not ANTHROPIC_API_KEY:
+        return '<p style="font-size:12px;color:rgba(74,90,114,0.7);text-align:center;padding:1rem">データなし</p>'
+    data_str = "\n".join(lines)
+    prompt = (
+        "あなたはSpring Arkのトレーニングコーチです。\n"
+        "以下の先月のトレーニング記録を分析し、JSONのみ出力してください。\n\n"
+        f"{data_str}\n\n"
+        '{"growth":"先月最も成長した点（60字以内）","challenge":"残っている課題（60字以内）","next":"来月への具体的提案（60字以内）"}'
+    )
+    try:
+        import json as _j
+        res = requests.post(
+            "https://api.anthropic.com/v1/messages",
+            headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
+            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 400, "messages": [{"role": "user", "content": prompt}]},
+            timeout=20,
+        )
+        text = res.json()["label, color, key in [("先月の成長","#a78bfa","growth"),("課題","#a78bfa","challenge"),("来月への提案","#2dd4bf","next")]:
+                val = str(p.get(key,"")).strip()[:100]
+                if val:
+                    items.append(
+                        f'<div style="background:rgba(139,92,246,0.08);border:1px solid rgba(139,92,246,0.2);border-radius:0.75rem;padding:0.75rem">' +
+                        f'<p style="font-size:9px;font-weight:900;color:{color};margin-bottom:4px">{label}</p>' +
+                        f'<p style="font-size:12px;color:rgba(255,255,255,0.8);line-height:1.6">{val}</p></div>'
+                    )
+            if items:
+                return (
+                    '<div style="display:flex;flex-direction:column;gap:0.5rem">' +
+                    '<p style="font-size:10px;font-weight:900;color:#a78bfa;letter-spacing:.15em;margin-bottom:4px">TRAINING MONTHLY ANALYSIS</p>' +
+                    "\n".join(items) + '</div>'
+                )
+    except Exnt(f"[WARN] Training analysis error: {ex}")
+    return '<p style="font-size:12px;color:rgba(74,90,114,0.7);text-align:center;padding:1rem">分析エラー</p>'
+
 # ── ▲ トレーニングログ取得ユーティリティ ここまで ───
 
 # ── ▼ 英語学習データ取得ユーティリティ ─────────────
@@ -1398,7 +1446,7 @@ weekly_training  = fetch_training_period(_last_monday.strftime("%Y-%m-%d"), _las
 monthly_training = fetch_training_period(_last_month_start.strftime("%Y-%m-%d"), _last_month_end.strftime("%Y-%m-%d"))
 today_training_html   = training_card_html(today_training,  "YESTERDAY'S TRAINING")
 weekly_training_html  = training_summary_html(weekly_training,  "WEEKLY")
-monthly_training_html = training_summary_html(monthly_training, "MONTHLY")
+monthly_training_html = generate_monthly_training_analysis(monthly_training)
 print(f"[DEBUG] monthly_training_html length={len(monthly_training_html)}, preview={monthly_training_html[:80]}")
 # ── ▲ トレーニングデータ取得ここまで ─────────────
 
