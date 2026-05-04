@@ -336,7 +336,9 @@ def fetch_training_period(start_str, end_str):
                 "回数":    p.get("回数", {}).get("number"),
                 "セット数": p.get("セット数", {}).get("number"),
             })
-        return sorted([s for s in sessions if s.get("種目", "")], key=lambda x: x["日付"])
+        filtered = sorted([s for s in sessions if s.get("種目", "")], key=lambda x: x["日付"])
+        print(f"[OK] トレーニング取得: {len(filtered)}件 ({start_str}〜{end_str})")
+        return filtered
     except Exception as e:
         print(f"[WARN] Training period fetch error: {e}")
         return []
