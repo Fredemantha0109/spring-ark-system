@@ -966,7 +966,7 @@ def generate_agent_comment(sleep_val, cond, judge, scores, missed_tasks, weight_
     prompt = (
         "あなたはSpring Arkのパーソナルコーチです。\n"
         "以下のデータをもとに、今日のコンディションと状況を踏まえた分析コメントを2〜3文で出力してください。\n"
-        "JSONではなく自然な日本語テキストのみ出力してください。\n
+        "JSONではなく自然な日本語テキストのみ出力してください。\n"
         "カテゴリ名は必ずW=Wellness、C=Communication、Ca=Career、I=Inputと表記してください。\n\n"
         f"- 睡眠: {sleep_val}h / 体調: {cond} / 体重: {weight_val}kg / 判定: {judge}\n"
         f"- スコア: {score_str}\n"
