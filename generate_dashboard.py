@@ -1558,10 +1558,6 @@ m_english_overall, m_english_retention, m_english_priority = generate_english_an
 def generate_weekly_comment(
     w_score_w, w_score_c, w_score_ca, w_score_i, w_score_total,
     w_weight_avg, w_sleep_avg, w_cond_summary, task_done_count,
-    journal_entries=None,
-    journal_weekly_entries=None,
-    topic_cards=None,
-    reuse_logs=None,
 ):
     if not ANTHROPIC_API_KEY:
         return [], ""
@@ -1580,24 +1576,6 @@ def generate_weekly_comment(
                     missed_tasks_w.append(f"{cat_name}: {task}")
     missed_str = "\n".join(list(dict.fromkeys(missed_tasks_w))[:8]) or "なし"
 
-    journal_section = build_journal_prompt_section(journal_entries or [])
-    english_section = build_english_prompt_section(topic_cards or [], reuse_logs or [])
-    weekly_journal_section = build_weekly_journal_section(journal_weekly_entries or [])
-
-    has_journal = bool(journal_section or weekly_journal_section)
-    journal_instruction = (
-        "\nジャーナリングデータも踏まえ、以下を分析に含めてください:\n"
-        "・今週繰り返し現れた放電源・充電源のパターン\n"
-        "・最も強く出ていたNVCのニーズ（安心・つながり・自律・承認 等）\n"
-        "・感情と行動習慣（タスク達成）の相関\n"
-    ) if has_journal else ""
-
-    analysis_instruction = (
-        "体重・睡眠・体調・完了タスク・未達タスク"
-        + ("・ジャーナリング(感情パターン・ニーズ・放電充電)" if has_journal else "")
-        + "を総合的に踏まえた今週の総合評価・考察・改善提案を200字程度で記載。来週への具体的アクションも含めること。"
-    )
-
     prompt = (
         "あなたはSpring Arkプロジェクトのパーソナルコーチです。\n"
         "以下の週次データをもとに、分析レポートをJSON形式で出力してください。\n\n"
@@ -1608,12 +1586,8 @@ def generate_weekly_comment(
         f"- 週平均スコア: W:{w_score_w} / C:{w_score_c} / Ca:{w_score_ca} / I:{w_score_i} / 総合:{w_score_total}\n\n"
         f"【実施できた主なタスク】\n{done_str}\n\n"
         f"【未達が多かったタスク】\n{missed_str}\n"
-        + weekly_journal_section
-        + journal_section
-        + english_section
-        + journal_instruction
-        + f"\n【総合分析の指示】{analysis_instruction}\n"
-        + "\n【出力形式】必ずJSONオブジェクトのみ出力してください。他のテキストは一切不要。\n"
+        "\n【総合分析の指示】体重・睡眠・体調・完了タスク・未達タスクを総合的に踏まえた今週の総合評価・考察・改善提案を200字程度で記載。来週への具体的アクションも含めること。\n"
+        "\n【出力形式】必ずJSONオブジェクトのみ出力してください。他のテキストは一切不要。\n"
         "{\n"
         '  "summaries": [\n'
         '    {"title": "要点タイトル(15文字以内)", "detail": "具体的分析(40文字以内)"},\n'
@@ -1647,11 +1621,6 @@ def generate_weekly_comment(
 def generate_monthly_comment(
     m_score_w, m_score_c, m_score_ca, m_score_i, m_score_total,
     m_weight_avg, m_sleep_avg, m_cond_summary, m_task_done_count,
-    journal_entries=None,
-    journal_weekly_entries=None,
-    journal_monthly_entries=None,
-    topic_cards=None,
-    reuse_logs=None,
 ):
     if not ANTHROPIC_API_KEY:
         return [], ""
@@ -1659,24 +1628,16 @@ def generate_monthly_comment(
     top_tasks = sorted(m_task_done_count.items(), key=lambda x: -x[1])[:12]
     done_str = "\n".join([f"・{t}({c}): {cnt}回" for (t, c), cnt in top_tasks]) or "なし"
 
-    monthly_journal_section = build_monthly_journal_section(journal_monthly_entries or [])
-    weekly_journal_section  = build_weekly_journal_section(journal_weekly_entries or [])
-    daily_journal_section   = build_journal_monthly_section(journal_entries or [])
-    english_section = build_english_prompt_section(topic_cards or [], reuse_logs or [])
-    has_journal = bool(monthly_journal_section or weekly_journal_section or daily_journal_section)
-    journal_instruction = (
-        "\nジャーナリングデータも踏まえ、以下を月次分析に含めてください:\n"
-        "・月を通じて繰り返された放電パターンと根本ニーズ\n"
-        "・最も頻出したNVCのニーズとその充足度の変化\n"
-        "・習慣（タスク達成）と感情エネルギーの相関\n"
-        "・来月に向けた具体的な一つの実験提案\n"
-    ) if has_journal else ""
-
-    analysis_instruction = (
-        "体重・睡眠・体調・完了タスク"
-        + ("・ジャーナリング(感情パターン・ニーズの変化・放電充電の傾向)" if has_journal else "")
-        + "を総合的に踏まえた今月の総合評価・考察・改善提案を200字程度で記載。来月への具体的な一つの実験も含めること。"
-    )
+    missed_tasks_m = []
+    for _, p in monthly_pages:
+        for cat_key, (done_key, cat_name) in cat_map.items():
+            plan_key = f"【{cat_key}】予定タスク"
+            plan = [t["name"].lstrip("🔥") for t in p.get(plan_key, {}).get("multi_select", [])]
+            done = [t["name"].lstrip("🔥") for t in p.get(done_key, {}).get("multi_select", [])]
+            for task in plan:
+                if task not in done:
+                    missed_tasks_m.append(f"{cat_name}: {task}")
+    missed_str = "\n".join(list(dict.fromkeys(missed_tasks_m))[:10]) or "なし"
 
     prompt = (
         "あなたはSpring Arkプロジェクトのパーソナルコーチです。\n"
@@ -1686,14 +1647,10 @@ def generate_monthly_comment(
         f"- 睡眠平均: {m_sleep_avg}h\n"
         f"- 体調: {m_cond_summary}\n"
         f"- 月平均スコア: W:{m_score_w} / C:{m_score_c} / Ca:{m_score_ca} / I:{m_score_i} / 総合:{m_score_total}\n\n"
-        f"【実施できた主なタスク（上位）】\n{done_str}\n"
-        + monthly_journal_section
-        + weekly_journal_section
-        + daily_journal_section
-        + english_section
-        + journal_instruction
-        + f"\n【総合分析の指示】{analysis_instruction}\n"
-        + "\n【出力形式】必ずJSONオブジェクトのみ出力してください。他のテキストは一切不要。\n"
+        f"【実施できた主なタスク（上位）】\n{done_str}\n\n"
+        f"【未達が多かったタスク】\n{missed_str}\n"
+        "\n【総合分析の指示】体重・睡眠・体調・完了タスク・未達タスクを総合的に踏まえた今月の総合評価・考察・改善提案を200字程度で記載。来月への具体的な一つの実験も含めること。\n"
+        "\n【出力形式】必ずJSONオブジェクトのみ出力してください。他のテキストは一切不要。\n"
         "{\n"
         '  "summaries": [\n'
         '    {"title": "要点タイトル(15文字以内)", "detail": "具体的分析(40文字以内)"},\n'
@@ -1798,11 +1755,6 @@ m_english_panel_html = make_english_panel_html(
 monthly_summaries, monthly_analysis = generate_monthly_comment(
     m_score_w, m_score_c, m_score_ca, m_score_i, m_score_total,
     m_weight_avg, m_sleep_avg, m_cond_summary, m_task_done_count,
-    journal_entries=m_journal_entries,
-    journal_weekly_entries=m_journal_weekly_entries,
-    journal_monthly_entries=m_journal_monthly_entries,
-    topic_cards=topic_cards,
-    reuse_logs=monthly_reuse_logs,
 )
 
 monthly_comment_html = ""
@@ -1930,10 +1882,6 @@ w_judge_text_c, w_judge_border = w_judge_colors[w_judge_color]
 weekly_summaries, weekly_analysis = generate_weekly_comment(
     w_score_w, w_score_c, w_score_ca, w_score_i, w_score_total,
     w_weight_avg, w_sleep_avg, w_cond_summary, task_done_count,
-    journal_entries=w_journal_entries,
-    journal_weekly_entries=w_journal_weekly_entries,
-    topic_cards=topic_cards,
-    reuse_logs=weekly_reuse_logs,
 )
 
 weekly_comment_html = ""
@@ -2267,11 +2215,11 @@ f"{score_diff_html}</div>\n"
     + f'<div class="flex flex-col items-center gap-1.5"><div class="{"w-8 h-8" if w_judge_label == "📈成長中" else "w-5 h-5"} rounded-full {"bg-amber-400 shadow-[0_0_14px_rgba(251,191,36,.75)]" if w_judge_label == "📈成長中" else "bg-amber-500/15 border border-amber-500/20"}"></div><span class="text-[8px] {"text-amber-400 font-black" if w_judge_label == "📈成長中" else "text-amber-500/40 font-bold"}">成長中</span></div>'
     + f'<div class="flex flex-col items-center gap-1.5"><div class="{"w-8 h-8" if w_judge_label == "🔧要改善" else "w-5 h-5"} rounded-full {"bg-red-400 shadow-[0_0_14px_rgba(239,68,68,.75)]" if w_judge_label == "🔧要改善" else "bg-red-500/15 border border-red-500/20"}"></div><span class="text-[8px] {"text-red-400 font-black" if w_judge_label == "🔧要改善" else "text-red-500/40 font-bold"}">要改善</span></div>'
     + '</div><div class="w-px h-12 bg-ark-border"></div>'
-    + f'<div><p class="text-2xl font-black {w_judge_text_c} leading-none">{w_judge_label}</p></div></div>'
-    + f'<div class="flex gap-3 sm:ml-auto"><div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-[9px] text-white/50 mb-1">体重平均</p><p class="text-base font-black text-white">' + str(w_weight_avg) + '<span class="text-xs font-normal text-ark-muted">kg</span></p></div>'
-    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-[9px] text-white/50 mb-1">睡眠平均</p><p class="text-base font-black text-amber-300">' + str(w_sleep_avg) + '<span class="text-xs font-normal">h</span></p></div>'
-    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[70px]"><p class="text-[9px] text-white/50 mb-1">体調</p><p class="text-base font-black text-white">' + w_cond_summary + '</p></div>'
-    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-[9px] text-white/50 mb-1">総合</p><p class="text-base font-black ' + w_judge_text_c + '">' + str(w_score_total) + '<span class="text-xs font-normal text-ark-muted">点</span></p></div>'
+    + f'<div><p class="text-4xl font-black {w_judge_text_c} leading-none">{w_judge_label}</p></div></div>'
+    + f'<div class="flex gap-3 sm:ml-auto"><div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-xs text-white/50 mb-1">体重平均</p><p class="text-xl font-black text-white">' + str(w_weight_avg) + '<span class="text-xs font-normal text-ark-muted">kg</span></p></div>'
+    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-xs text-white/50 mb-1">睡眠平均</p><p class="text-xl font-black text-amber-300">' + str(w_sleep_avg) + '<span class="text-xs font-normal">h</span></p></div>'
+    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[70px]"><p class="text-xs text-white/50 mb-1">体調</p><p class="text-xl font-black text-white">' + w_cond_summary + '</p></div>'
+    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-xs text-white/50 mb-1">総合</p><p class="text-xl font-black ' + w_judge_text_c + '">' + str(w_score_total) + '<span class="text-xs font-normal text-ark-muted">点</span></p></div>'
     + '</div></div></div></section>'
     + '<div class="grid grid-cols-1 md:grid-cols-2 gap-5"><div class="flex flex-col gap-3">'
     + weekly_cards_html
@@ -2287,11 +2235,11 @@ f"{score_diff_html}</div>\n"
     + f'<div class="flex flex-col items-center gap-1.5"><div class="{"w-8 h-8" if m_judge_label == "📊成長中" else "w-5 h-5"} rounded-full {"bg-amber-400 shadow-[0_0_14px_rgba(251,191,36,.75)]" if m_judge_label == "📊成長中" else "bg-amber-500/15 border border-amber-500/20"}"></div><span class="text-[8px] {"text-amber-400 font-black" if m_judge_label == "📊成長中" else "text-amber-500/40 font-bold"}">成長中</span></div>'
     + f'<div class="flex flex-col items-center gap-1.5"><div class="{"w-8 h-8" if m_judge_label == "🔄要改善" else "w-5 h-5"} rounded-full {"bg-red-400 shadow-[0_0_14px_rgba(239,68,68,.75)]" if m_judge_label == "🔄要改善" else "bg-red-500/15 border border-red-500/20"}"></div><span class="text-[8px] {"text-red-400 font-black" if m_judge_label == "🔄要改善" else "text-red-500/40 font-bold"}">要改善</span></div>'
     + '</div><div class="w-px h-12 bg-ark-border"></div>'
-    + f'<div><p class="text-2xl font-black {m_judge_text_c} leading-none">{m_judge_label}</p></div></div>'
-    + f'<div class="flex gap-3 sm:ml-auto"><div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-[9px] text-white/50 mb-1">体重平均</p><p class="text-base font-black text-white">' + str(m_weight_avg) + '<span class="text-xs font-normal text-ark-muted">kg</span></p></div>'
-    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-[9px] text-white/50 mb-1">睡眠平均</p><p class="text-base font-black text-amber-300">' + str(m_sleep_avg) + '<span class="text-xs font-normal">h</span></p></div>'
-    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[70px]"><p class="text-[9px] text-white/50 mb-1">体調</p><p class="text-base font-black text-white">' + m_cond_summary + '</p></div>'
-    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-[9px] text-white/50 mb-1">総合</p><p class="text-base font-black ' + m_judge_text_c + '">' + str(m_score_total) + '<span class="text-xs font-normal text-ark-muted">点</span></p></div>'
+    + f'<div><p class="text-4xl font-black {m_judge_text_c} leading-none">{m_judge_label}</p></div></div>'
+    + f'<div class="flex gap-3 sm:ml-auto"><div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-xs text-white/50 mb-1">体重平均</p><p class="text-xl font-black text-white">' + str(m_weight_avg) + '<span class="text-xs font-normal text-ark-muted">kg</span></p></div>'
+    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-xs text-white/50 mb-1">睡眠平均</p><p class="text-xl font-black text-amber-300">' + str(m_sleep_avg) + '<span class="text-xs font-normal">h</span></p></div>'
+    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[70px]"><p class="text-xs text-white/50 mb-1">体調</p><p class="text-xl font-black text-white">' + m_cond_summary + '</p></div>'
+    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-xs text-white/50 mb-1">総合</p><p class="text-xl font-black ' + m_judge_text_c + '">' + str(m_score_total) + '<span class="text-xs font-normal text-ark-muted">点</span></p></div>'
     + '</div></div></div></section>'
     + '<div class="grid grid-cols-1 md:grid-cols-2 gap-5"><div class="flex flex-col gap-3">'
     + monthly_cards_html
