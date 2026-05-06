@@ -357,7 +357,13 @@ def _training_rows_html(sessions):
         set_info = f"{kaisuu}回×{setto}セット" if kaisuu and setto else ""
         if jisseki and mokuhyo:
             diff = round(jisseki - mokuhyo, 1)
-            clr = "text-green-400" if diff > 0 else ("text-red-400" if diff < 0 else "text-white/40")
+            is_pullup = "懸垂" in shumoku
+            if diff > 0:
+                clr = "text-red-400" if is_pullup else "text-green-400"
+            elif diff < 0:
+                clr = "text-green-400" if is_pullup else "text-red-400"
+            else:
+                clr = "text-white/40"
             sign = "+" if diff > 0 else ""
             diff_html = f'<span class="text-[9px] {clr} font-bold ml-1">{sign}{diff}kg</span>'
             w = f'<span class="text-sm font-black text-white">{jisseki}kg</span><span class="text-[9px] text-ark-muted ml-1">/目標{mokuhyo}kg</span>{diff_html}'
@@ -894,6 +900,22 @@ if last_done:
 
 
 # ── タスク行HTML生成 ──────────────────────────────
+_TASK_NAME_MAP = {
+    "ライアン": "動画視聴",
+    "Soccer":   "動画視聴",
+    "Scrambled":"動画視聴",
+    "Youtube":  "動画視聴",
+}
+_DAY_SUFFIXES = ["（月）", "（火）", "（水）", "（木）", "（金）", "（土）", "（日）"]
+
+def _normalize_task_display(name: str) -> str:
+    for k, v in _TASK_NAME_MAP.items():
+        if k in name:
+            return v
+    for d in _DAY_SUFFIXES:
+        name = name.replace(d, "")
+    return name
+
 def task_rows_html(plan_tasks, done_tasks):
     if not plan_tasks:
         return '<p class="text-xs italic py-1" style="color:rgba(74,90,114,0.7)">前日タスクなし</p>'
@@ -910,12 +932,13 @@ def task_rows_html(plan_tasks, done_tasks):
             )
         else:
             icon = '<div class="w-3.5 h-3.5 rounded-full flex-shrink-0 border border-white/15 bg-white/5"></div>'
+        display_name = _normalize_task_display(task.lstrip("🔥").strip())
         name_class = "text-white/40 line-through" if done else "text-white/80"
         row_class  = "priority-row" if "🔥" in task else ""
         items.append(
             '<div class="flex items-center gap-1.5 py-[3px] ' + row_class + '">'
             + icon
-            + '<span class="text-xs flex-1 leading-tight ' + name_class + '">' + task + '</span>'
+            + '<span class="text-xs flex-1 leading-tight ' + name_class + '">' + display_name + '</span>'
             + '</div>'
         )
     return '<div class="grid grid-cols-2 gap-x-3 gap-y-0.5">' + "\n".join(items) + '</div>'
@@ -960,7 +983,6 @@ ICON_I  = '<svg class="w-4 h-4" viewBox="0 0 24 24" fill="none" stroke="currentC
 def generate_agent_comment(sleep_val, cond, judge, scores, missed_tasks, weight_val, cal_events):
     if not ANTHROPIC_API_KEY:
         return ""
-    missed_str = "\n".join([f"・{cat}: {task}" for task, cat in missed_tasks]) or "なし"
     cal_str = "\n".join([f"・{ev['start']} {ev['name']}" for ev in cal_events]) if cal_events else "なし"
     score_str = f"W:{scores[0]} / C:{scores[1]} / Ca:{scores[2]} / I:{scores[3]}"
     prompt = (
@@ -970,14 +992,13 @@ def generate_agent_comment(sleep_val, cond, judge, scores, missed_tasks, weight_
         "カテゴリ名は必ずW=Wellness、C=Communication、Ca=Career、I=Inputと表記してください。\n\n"
         f"- 睡眠: {sleep_val}h / 体調: {cond} / 体重: {weight_val}kg / 判定: {judge}\n"
         f"- スコア: {score_str}\n"
-        f"- 昨日の未達タスク: {missed_str}\n"
         f"- 今日のカレンダー: {cal_str}\n"
     )
     try:
         res = requests.post(
             "https://api.anthropic.com/v1/messages",
             headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 200, "messages": [{"role": "user", "content": prompt}]},
+            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 400, "messages": [{"role": "user", "content": prompt}]},
             timeout=15,
         )
         return res.json()["content"][0]["text"].strip()
@@ -1052,8 +1073,7 @@ agent_comment_html = (
     f'</div>'
 ) if agent_comment else ""
 
-missed_html = ai_html if ai_html else '<p class="text-xs text-white/50 text-center py-2">昨日の未達タスクなし 🎉</p>'
-ai_section_inner = agent_comment_html + missed_html
+ai_section_inner = agent_comment_html
 
 calendar_html = ""
 if calendar_events:
@@ -1099,10 +1119,9 @@ def calc_load_mode(events):
                 total_mins += (eh * 60 + em) - (sh * 60 + sm)
             except:
                 pass
-    count = len(events)
-    if count >= 3 or total_mins >= 120:
+    if total_mins >= 180:
         return "🔴 多忙日", "red",   "習慣は最小限で"
-    elif count >= 1 or total_mins >= 60:
+    elif total_mins >= 90:
         return "🟡 通常日", "amber", "いつも通りで"
     else:
         return "🟢 余裕日", "green", "習慣を積み上げるチャンス"
