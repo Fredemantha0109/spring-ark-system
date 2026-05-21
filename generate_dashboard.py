@@ -1281,8 +1281,8 @@ if ai_strategies:
         items_html.append(
             '<div class="flex items-start gap-3 bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">' +
             '<span class="w-5 h-5 rounded-full bg-violet-500/25 border border-violet-500/35 text-[9px] font-black text-violet-300 flex items-center justify-center flex-shrink-0 mt-0.5">' + str(i) + '</span>' +
-            '<div><p class="text-xs font-black text-white">' + s.get("title", "") + '</p>' +
-            '<p class="privacy-target text-[10px] text-white/50 mt-0.5">' + s.get("detail", "") + '</p></div>' +
+            '<div class="min-w-0"><p class="text-xs font-black text-white">' + s.get("title", "") + '</p>' +
+            '<p class="privacy-target text-[10px] text-white/50 mt-0.5 leading-relaxed">' + s.get("detail", "") + '</p></div>' +
             '</div>'
         )
     strategy_html = (
@@ -1856,8 +1856,8 @@ if monthly_summaries or monthly_analysis:
         m_items.append(
             f'<div class="flex items-start gap-3 bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">'
             f'<span class="w-5 h-5 rounded-full bg-violet-500/25 border border-violet-500/35 text-[9px] font-black text-violet-300 flex items-center justify-center flex-shrink-0 mt-0.5">{i}</span>'
-            f'<div><p class="text-xs font-black text-white">{s.get("title","")}</p>'
-            f'<p class="text-[10px] text-white/50 mt-0.5">{s.get("detail","")}</p></div>'
+            f'<div class="min-w-0"><p class="text-xs font-black text-white">{s.get("title","")}</p>'
+            f'<p class="privacy-target text-[10px] text-white/50 mt-0.5 leading-relaxed">{s.get("detail","")}</p></div>'
             f'</div>'
         )
     m_analysis_html = (
@@ -1983,8 +1983,8 @@ if weekly_summaries or weekly_analysis:
         items.append(
             f'<div class="flex items-start gap-3 bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">'
             f'<span class="w-5 h-5 rounded-full bg-violet-500/25 border border-violet-500/35 text-[9px] font-black text-violet-300 flex items-center justify-center flex-shrink-0 mt-0.5">{i}</span>'
-            f'<div><p class="text-xs font-black text-white">{s.get("title","")}</p>'
-            f'<p class="text-[10px] text-white/50 mt-0.5">{s.get("detail","")}</p></div>'
+            f'<div class="min-w-0"><p class="text-xs font-black text-white">{s.get("title","")}</p>'
+            f'<p class="privacy-target text-[10px] text-white/50 mt-0.5 leading-relaxed">{s.get("detail","")}</p></div>'
             f'</div>'
         )
     analysis_html = (
