@@ -1863,7 +1863,7 @@ if monthly_summaries or monthly_analysis:
     m_analysis_html = (
         f'<div class="bg-ark-dim/30 border border-ark-border rounded-xl px-3 py-3 mt-1">'
         f'<p class="text-[10px] font-black text-violet-400 mb-1.5">総合分析</p>'
-        f'<p class="text-xs text-white/75 leading-relaxed">{monthly_analysis}</p>'
+        f'<p class="privacy-target text-xs text-white/75 leading-relaxed">{monthly_analysis}</p>'
         f'</div>'
     ) if monthly_analysis else ""
 
@@ -1990,7 +1990,7 @@ if weekly_summaries or weekly_analysis:
     analysis_html = (
         f'<div class="bg-ark-dim/30 border border-ark-border rounded-xl px-3 py-3 mt-1">'
         f'<p class="text-[10px] font-black text-violet-400 mb-1.5">総合分析</p>'
-        f'<p class="text-xs text-white/75 leading-relaxed">{weekly_analysis}</p>'
+        f'<p class="privacy-target text-xs text-white/75 leading-relaxed">{weekly_analysis}</p>'
         f'</div>'
     ) if weekly_analysis else ""
 
