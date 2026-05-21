@@ -17,7 +17,9 @@ NOTION_TOKEN         = os.environ["NOTION_TOKEN"]
 DATABASE_ID          = os.environ["DATABASE_ID"]
 SURGE_TOKEN          = os.environ["SURGE_TOKEN"]
 SURGE_DOMAIN         = os.environ["SURGE_DOMAIN"]
-CALENDAR_DATABASE_ID = os.environ.get("CALENDAR_DATABASE_ID", "")
+CALENDAR_DATABASE_ID       = os.environ.get("CALENDAR_DATABASE_ID", "")   # 旧Notion（互換用）
+GOOGLE_CALENDAR_CREDENTIALS = os.environ.get("GOOGLE_CALENDAR_CREDENTIALS", "")  # サービスアカウントJSON文字列
+GOOGLE_CALENDAR_ID          = os.environ.get("GOOGLE_CALENDAR_ID", "fulfuls7@gmail.com")
 JOURNAL_DATABASE_ID          = os.environ.get("JOURNAL_DATABASE_ID", "")
 JOURNAL_WEEKLY_DATABASE_ID   = os.environ.get("JOURNAL_WEEKLY_DATABASE_ID", "")
 JOURNAL_MONTHLY_DATABASE_ID  = os.environ.get("JOURNAL_MONTHLY_DATABASE_ID", "")
@@ -30,6 +32,54 @@ HEADERS = {
     "Notion-Version": "2022-06-28",
     "Content-Type": "application/json",
 }
+
+# ── Google Calendar ヘルパー ─────────────────────────
+def _gcal_service():
+    """サービスアカウントJSON からCalendar APIクライアントを生成する。失敗時はNoneを返す。"""
+    if not GOOGLE_CALENDAR_CREDENTIALS:
+        return None
+    try:
+        from google.oauth2.service_account import Credentials
+        from googleapiclient.discovery import build
+        creds = Credentials.from_service_account_info(
+            json.loads(GOOGLE_CALENDAR_CREDENTIALS),
+            scopes=["https://www.googleapis.com/auth/calendar.readonly"],
+        )
+        return build("calendar", "v3", credentials=creds)
+    except Exception as e:
+        print(f"[WARN] Google Calendar サービス初期化失敗: {e}")
+        return None
+
+def _fetch_gcal_events(date_str):
+    """date_str (YYYY-MM-DD, SGT) の時刻付きイベントを [{name, start, end}] で返す。"""
+    service = _gcal_service()
+    if not service:
+        return None  # Noneを返すと呼び出し側でNotionにフォールバック
+    time_min = date_str + "T00:00:00+08:00"
+    time_max = date_str + "T23:59:59+08:00"
+    try:
+        result = service.events().list(
+            calendarId=GOOGLE_CALENDAR_ID,
+            timeMin=time_min,
+            timeMax=time_max,
+            singleEvents=True,
+            orderBy="startTime",
+            timeZone="Asia/Singapore",
+        ).execute()
+        events = []
+        for ev in result.get("items", []):
+            name = ev.get("summary", "").strip()
+            start_dt = ev.get("start", {}).get("dateTime", "")
+            end_dt   = ev.get("end",   {}).get("dateTime", "")
+            if start_dt and name:
+                start_time = start_dt[11:16]
+                end_time   = end_dt[11:16] if end_dt else ""
+                events.append({"name": name, "start": start_time, "end": end_time})
+        print(f"[OK] Google Calendar 取得: {len(events)}件 ({date_str})")
+        return events
+    except Exception as e:
+        print(f"[WARN] Google Calendar fetch error ({date_str}): {e}")
+        return []
 
 # ── 日付(SGT = UTC+8) ────────────────────────────
 sgt       = timezone(timedelta(hours=8))
@@ -677,6 +727,7 @@ score_w  = get_score("【W】スコア")
 score_c  = get_score("【C】スコア")
 score_ca = get_score("【Ca】スコア")
 score_i  = get_score("【I】スコア")
+# score_total は plan_w/c/ca/i 定義後に再計算するためここでは仮計算
 score_total = round((score_w + score_c + score_ca + score_i) / 4)
 
 weight    = props_today.get("体重", {}).get("number") or "-"
@@ -788,6 +839,14 @@ done_w  = get_tasks("【W】実績")
 done_c  = get_tasks("【C】実績")
 done_ca = get_tasks("【Ca】実績")
 done_i  = get_tasks("【I】実績")
+
+# 予定タスク0件のカテゴリはスコアを除外し、総合スコアを再計算
+if len(plan_w)  == 0: score_w  = None
+if len(plan_c)  == 0: score_c  = None
+if len(plan_ca) == 0: score_ca = None
+if len(plan_i)  == 0: score_i  = None
+_valid_scores = [s for s in [score_w, score_c, score_ca, score_i] if s is not None]
+score_total = round(sum(_valid_scores) / len(_valid_scores)) if _valid_scores else 0
 
 missed_tasks_all = []
 for task in plan_w:
@@ -952,6 +1011,9 @@ def category_card(name, subtitle, icon_svg, color, score, plan_tasks, done_tasks
     }
     text_c, icon_wrap, card_border, bar_grad = color_map[color]
     rows = task_rows_html(plan_tasks, done_tasks)
+    score_disp = "-" if score is None else str(score)
+    bar_width  = "0" if score is None else str(score)
+    score_suffix = "" if score is None else '<span class="text-sm text-ark-muted font-normal">/100点</span>'
     return (
         '<div class="ark-card bg-ark-card border ' + card_border + ' rounded-2xl p-4 min-h-[120px]">'
         '<div class="flex items-start justify-between mb-3">'
@@ -963,12 +1025,11 @@ def category_card(name, subtitle, icon_svg, color, score, plan_tasks, done_tasks
         '<p class="text-xs font-black ' + text_c + ' tracking-[.15em]">' + name + '</p>'
         '<p class="text-xs text-white/50">' + subtitle + '</p>'
         '</div></div>'
-        '<p class="text-xl font-black ' + text_c + '">' + str(score)
-        + '<span class="text-sm text-ark-muted font-normal">/100点</span></p>'
+        '<p class="text-xl font-black ' + text_c + '">' + score_disp + score_suffix + '</p>'
         '</div>'
         '<div class="mb-3">'
         '<div class="h-1.5 bg-ark-dim rounded-full overflow-hidden">'
-        '<div class="h-full rounded-full bg-gradient-to-r ' + bar_grad + ' bar" style="width:' + str(score) + '%"></div>'
+        '<div class="h-full rounded-full bg-gradient-to-r ' + bar_grad + ' bar" style="width:' + bar_width + '%"></div>'
         '</div></div>'
         + rows
         + '</div>'
@@ -984,7 +1045,10 @@ def generate_agent_comment(sleep_val, cond, judge, scores, missed_tasks, weight_
     if not ANTHROPIC_API_KEY:
         return ""
     cal_str = "\n".join([f"・{ev['start']} {ev['name']}" for ev in cal_events]) if cal_events else "なし"
-    score_str = f"W:{scores[0]} / C:{scores[1]} / Ca:{scores[2]} / I:{scores[3]}"
+    score_str = " / ".join(
+        f"{k}:{(v if v is not None else '-')}"
+        for k, v in zip(["W", "C", "Ca", "I"], scores)
+    )
     prompt = (
         "あなたはSpring Arkのパーソナルコーチです。\n"
         "以下のデータをもとに、今日のコンディションと状況を踏まえた分析コメントを2〜3文で出力してください。\n"
@@ -1021,9 +1085,12 @@ if ai_note:
             )
     ai_html = "\n".join(items)
 
-# ── カレンダーDB取得 ──────────────────────────────
+# ── カレンダー取得 (Google Calendar 優先 → Notion フォールバック) ──
 calendar_events = []
-if CALENDAR_DATABASE_ID:
+_gcal_result = _fetch_gcal_events(today)
+if _gcal_result is not None:
+    calendar_events = _gcal_result
+elif CALENDAR_DATABASE_ID:
     try:
         today_start = today + "T00:00:00+08:00"
         today_end   = today + "T23:59:59+08:00"
@@ -1041,7 +1108,7 @@ if CALENDAR_DATABASE_ID:
             }
         )
         cal_data = cal_res.json()
-        print(f"[DEBUG] Calendar status: {cal_res.status_code}, count: {len(cal_data.get('results', []))}")
+        print(f"[DEBUG] Notion Calendar status: {cal_res.status_code}, count: {len(cal_data.get('results', []))}")
         for page in cal_data.get("results", []):
             props = page["properties"]
             name = ""
@@ -1057,7 +1124,7 @@ if CALENDAR_DATABASE_ID:
                 if name:
                     calendar_events.append({"name": name, "start": start_time, "end": end_time})
     except Exception as e:
-        print(f"[WARN] Calendar fetch error: {e}")
+        print(f"[WARN] Notion Calendar fetch error: {e}")
 
 agent_comment = generate_agent_comment(
     sleep, condition, judge_label,
@@ -1069,7 +1136,7 @@ agent_comment = generate_agent_comment(
 
 agent_comment_html = (
     f'<div class="bg-ark-dim/40 border border-violet-500/15 rounded-xl px-3 py-2.5 mb-2">'
-    f'<p class="text-xs text-white/80 leading-relaxed">{agent_comment}</p>'
+    f'<p class="privacy-target text-xs text-white/80 leading-relaxed">{agent_comment}</p>'
     f'</div>'
 ) if agent_comment else ""
 
@@ -1092,7 +1159,7 @@ if calendar_events:
             f'<div class="flex items-center gap-3 bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2">'
             f'<span class="text-[11px] font-black text-sky-400 w-10 flex-shrink-0">{ev["start"]}</span>'
             f'<div class="w-px h-4 bg-ark-border flex-shrink-0"></div>'
-            f'<p class="text-xs text-white/85 flex-1">{ev["name"]}</p>'
+            f'<p class="privacy-target text-xs text-white/85 flex-1">{ev["name"]}</p>'
             f'<span class="text-[9px] text-ark-muted">{duration}</span>'
             f'</div>'
         )
@@ -1129,6 +1196,12 @@ def calc_load_mode(events):
 load_label, load_color, load_sub = calc_load_mode(calendar_events)
 
 def fetch_load_for_date(date_str):
+    # Google Calendar 優先
+    gcal = _fetch_gcal_events(date_str)
+    if gcal is not None:
+        label, _, _ = calc_load_mode(gcal)
+        return label
+    # Notion フォールバック
     if not CALENDAR_DATABASE_ID:
         return "通常日"
     try:
@@ -1209,7 +1282,7 @@ if ai_strategies:
             '<div class="flex items-start gap-3 bg-ark-dim/40 border border-ark-border rounded-xl px-3 py-2.5">' +
             '<span class="w-5 h-5 rounded-full bg-violet-500/25 border border-violet-500/35 text-[9px] font-black text-violet-300 flex items-center justify-center flex-shrink-0 mt-0.5">' + str(i) + '</span>' +
             '<div><p class="text-xs font-black text-white">' + s.get("title", "") + '</p>' +
-            '<p class="text-[10px] text-white/50 mt-0.5">' + s.get("detail", "") + '</p></div>' +
+            '<p class="privacy-target text-[10px] text-white/50 mt-0.5">' + s.get("detail", "") + '</p></div>' +
             '</div>'
         )
     strategy_html = (
@@ -2111,10 +2184,25 @@ html = (
     "    }\n"
     "    @keyframes pulse-slow { 0%,100%{opacity:1} 50%{opacity:.4} }\n"
     "    .animate-pulse-slow { animation: pulse-slow 3s ease-in-out infinite; }\n"
+    "    @media (min-width: 1200px) {\n"
+    "      .ark-page { max-width: 1100px !important; font-size: 1.1rem; }\n"
+    "      .ark-page .text-xs  { font-size: 0.8rem  !important; }\n"
+    "      .ark-page .text-sm  { font-size: 0.9rem  !important; }\n"
+    "      .ark-page .text-xl  { font-size: 1.3rem  !important; }\n"
+    "      .ark-page .text-2xl { font-size: 1.6rem  !important; }\n"
+    "      .ark-page .p-4  { padding: 1.4rem !important; }\n"
+    "      .ark-page .p-5  { padding: 1.6rem !important; }\n"
+    "      .ark-page .gap-5 { gap: 1.6rem !important; }\n"
+    "    }\n"
+    "    /* プライバシーモード */\n"
+    "    .privacy-target { transition: filter .3s; }\n"
+    "    body.privacy-on .privacy-target { filter: blur(6px); user-select: none; }\n"
+    "    #privacy-btn { transition: background .2s, color .2s; }\n"
+    "    body.privacy-on #privacy-btn { background: rgba(99,102,241,.25); color: #a5b4fc; border-color: rgba(99,102,241,.5); }\n"
     "  </style>\n"
     "</head>\n"
     '<body class="min-h-screen text-white antialiased">\n'
-    '<div class="max-w-5xl mx-auto px-4 py-6 flex flex-col gap-5">\n'
+    '<div class="ark-page max-w-5xl mx-auto px-4 py-6 flex flex-col gap-5">\n'
 
     "\n  <header class=\"flex items-start justify-between\">\n"
     "    <div>\n"
@@ -2124,9 +2212,12 @@ html = (
     "      </div>\n"
     f"      <p class=\"text-xs text-white/50\">{header_date}</p>\n"
     "    </div>\n"
+    + '<div class="flex items-center gap-2">'
     + '<div id="badge-daily">' + load_badge_html + '</div>'
     + '<div id="badge-weekly" style="display:none">' + w_badge_html + '</div>'
     + '<div id="badge-monthly" style="display:none">' + m_badge_html + '</div>'
+    + '<button id="privacy-btn" onclick="togglePrivacy()" class="flex-shrink-0 flex items-center gap-1.5 bg-ark-dim/60 border border-ark-border rounded-full px-3 py-1.5 text-[10px] font-black text-ark-muted hover:text-white cursor-pointer">🔒 プライバシー</button>'
+    + '</div>'
     + "  </header>\n"
 
     + '<div id="daily-view">'
@@ -2266,7 +2357,7 @@ f"{score_diff_html}</div>\n"
     + monthly_comment_html
     + '</div></div></div>'
 
-    + '<script>var ON="tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border";var OFF="tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted";function switchTab(t){document.getElementById("daily-view").style.display=t==="daily"?"":"none";document.getElementById("weekly-view").style.display=t==="weekly"?"":"none";document.getElementById("monthly-view").style.display=t==="monthly"?"":"none";document.getElementById("badge-daily").style.display=t==="daily"?"":"none";document.getElementById("badge-weekly").style.display=t==="weekly"?"":"none";document.getElementById("badge-monthly").style.display=t==="monthly"?"":"none";document.getElementById("tab-daily").className=t==="daily"?ON:OFF;document.getElementById("tab-weekly").className=t==="weekly"?ON:OFF;document.getElementById("tab-monthly").className=t==="monthly"?ON:OFF;}</script>'
+    + '<script>var ON="tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border";var OFF="tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted";function switchTab(t){document.getElementById("daily-view").style.display=t==="daily"?"":"none";document.getElementById("weekly-view").style.display=t==="weekly"?"":"none";document.getElementById("monthly-view").style.display=t==="monthly"?"":"none";document.getElementById("badge-daily").style.display=t==="daily"?"":"none";document.getElementById("badge-weekly").style.display=t==="weekly"?"":"none";document.getElementById("badge-monthly").style.display=t==="monthly"?"":"none";document.getElementById("tab-daily").className=t==="daily"?ON:OFF;document.getElementById("tab-weekly").className=t==="weekly"?ON:OFF;document.getElementById("tab-monthly").className=t==="monthly"?ON:OFF;}function togglePrivacy(){var b=document.body;b.classList.toggle("privacy-on");var btn=document.getElementById("privacy-btn");btn.textContent=b.classList.contains("privacy-on")?"🔓 解除":"🔒 プライバシー";}</script>'
 
     "\n  <footer class=\"flex items-center justify-between pt-1 pb-3\">\n"
     "    <p class=\"text-[9px] text-ark-muted\">SPRING ARK &copy; 2026</p>\n"

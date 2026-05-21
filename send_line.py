@@ -57,18 +57,83 @@ if __name__ == "__main__":
     props_today     = fetch_props(today)
     props_yesterday = fetch_props(yesterday)
 
+    # ── デバッグ出力 ──────────────────────────────────
+    print(f"\n{'='*60}")
+    print(f"[DEBUG] today={today}, yesterday={yesterday}")
+    print(f"[DEBUG] props_today  取得: {'OK' if props_today else 'None（ページなし）'}")
+    print(f"[DEBUG] props_yesterday 取得: {'OK' if props_yesterday else 'None（ページなし）'}")
+
+    if props_today:
+        print(f"\n[DEBUG] ── props_today の全プロパティ ──")
+        for key, val in props_today.items():
+            vtype = val.get("type", "?")
+            # 型ごとに値を取り出す
+            if vtype == "number":
+                v = val.get("number")
+            elif vtype == "select":
+                v = (val.get("select") or {}).get("name")
+            elif vtype == "formula":
+                v = val.get("formula", {}).get("number") or val.get("formula", {}).get("string")
+            elif vtype == "title":
+                v = "".join(t.get("plain_text","") for t in val.get("title", []))
+            elif vtype == "rich_text":
+                v = "".join(t.get("plain_text","") for t in val.get("rich_text", []))
+            elif vtype == "date":
+                v = (val.get("date") or {}).get("start")
+            elif vtype == "checkbox":
+                v = val.get("checkbox")
+            else:
+                v = f"(type={vtype})"
+            print(f"  [{vtype}] {key!r}: {v!r}")
+
+    if props_yesterday:
+        print(f"\n[DEBUG] ── props_yesterday の全プロパティ ──")
+        for key, val in props_yesterday.items():
+            vtype = val.get("type", "?")
+            if vtype == "number":
+                v = val.get("number")
+            elif vtype == "select":
+                v = (val.get("select") or {}).get("name")
+            elif vtype == "formula":
+                v = val.get("formula", {}).get("number") or val.get("formula", {}).get("string")
+            elif vtype == "title":
+                v = "".join(t.get("plain_text","") for t in val.get("title", []))
+            elif vtype == "rich_text":
+                v = "".join(t.get("plain_text","") for t in val.get("rich_text", []))
+            elif vtype == "date":
+                v = (val.get("date") or {}).get("start")
+            elif vtype == "checkbox":
+                v = val.get("checkbox")
+            else:
+                v = f"(type={vtype})"
+            print(f"  [{vtype}] {key!r}: {v!r}")
+    print(f"{'='*60}\n")
+    # ── デバッグ出力ここまで ──────────────────────────
+
     if not props_yesterday:
         send_line_message(f"⚠️ {yesterday} のデータが見つかりません")
         exit(1)
     if not props_today:
         props_today = props_yesterday
 
-    # スコアは昨日のページから
-    score_total = props_yesterday.get("総合スコア", {}).get("formula", {}).get("number", 0) or 0
-    score_w     = props_yesterday.get("【W】スコア",  {}).get("formula", {}).get("number", 0) or 0
-    score_c     = props_yesterday.get("【C】スコア",  {}).get("formula", {}).get("number", 0) or 0
-    score_ca    = props_yesterday.get("【Ca】スコア", {}).get("formula", {}).get("number", 0) or 0
-    score_i     = props_yesterday.get("【I】スコア",  {}).get("formula", {}).get("number", 0) or 0
+    # 予定タスク件数（昨日ページ）
+    def plan_count(key):
+        return len(props_yesterday.get(key, {}).get("multi_select", []))
+
+    # スコアは昨日のページから（予定タスク0件のカテゴリは None = 総合スコアから除外）
+    def get_score_or_none(score_key, plan_key):
+        if plan_count(plan_key) == 0:
+            return None
+        return props_yesterday.get(score_key, {}).get("formula", {}).get("number", 0) or 0
+
+    score_w  = get_score_or_none("【W】スコア",  "【W】予定タスク")
+    score_c  = get_score_or_none("【C】スコア",  "【C】予定タスク")
+    score_ca = get_score_or_none("【Ca】スコア", "【Ca】予定タスク")
+    score_i  = get_score_or_none("【I】スコア",  "【I】予定タスク")
+    _valid = [s for s in [score_w, score_c, score_ca, score_i] if s is not None]
+    score_total = round(sum(_valid) / len(_valid)) if _valid else 0
+
+    def fmt(s): return str(int(s)) if s is not None else "-"
 
     # 体重・睡眠・体調は今日のページから
     weight         = props_today.get("体重", {}).get("number")
@@ -94,7 +159,7 @@ if __name__ == "__main__":
         f"{today} {judge}\n"
         f"\n"
         f"📊 総合スコア: {score_total}点\n"
-        f"  W: {score_w} / C: {score_c} / Ca: {score_ca} / I: {score_i}\n"
+        f"  W: {fmt(score_w)} / C: {fmt(score_c)} / Ca: {fmt(score_ca)} / I: {fmt(score_i)}\n"
         f"\n"
         f"💪 体重: {weight_str}\n"
         f"😴 睡眠: {sleep_str}\n"
