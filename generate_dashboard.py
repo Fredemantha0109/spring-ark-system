@@ -26,6 +26,8 @@ JOURNAL_MONTHLY_DATABASE_ID  = os.environ.get("JOURNAL_MONTHLY_DATABASE_ID", "")
 TRAINING_DATABASE_ID         = os.environ.get("TRAINING_DATABASE_ID", "")
 TOPIC_CARD_DATABASE_ID       = os.environ.get("TOPIC_CARD_DATABASE_ID", "")
 REUSE_LOG_DATABASE_ID        = os.environ.get("REUSE_LOG_DATABASE_ID", "")
+RUN_WEEKLY  = os.environ.get("RUN_WEEKLY",  "false").lower() == "true"
+RUN_MONTHLY = os.environ.get("RUN_MONTHLY", "false").lower() == "true"
 
 HEADERS = {
     "Authorization": f"Bearer {NOTION_TOKEN}",
@@ -1637,12 +1639,19 @@ monthly_reuse_logs = fetch_reuse_log_period(
 # ── ▲ 英語学習データ取得ここまで ─────────────────
 
 # ── ▼ 英語学習AI分析実行 ─────────────────────────
-w_english_overall, w_english_retention, w_english_priority = generate_english_analysis(
-    topic_cards, weekly_reuse_logs, w_score_c
-)
-m_english_overall, m_english_retention, m_english_priority = generate_english_analysis(
-    topic_cards, monthly_reuse_logs, m_score_c
-)
+if RUN_WEEKLY:
+    w_english_overall, w_english_retention, w_english_priority = generate_english_analysis(
+        topic_cards, weekly_reuse_logs, w_score_c
+    )
+else:
+    w_english_overall, w_english_retention, w_english_priority = "", "", []
+
+if RUN_MONTHLY:
+    m_english_overall, m_english_retention, m_english_priority = generate_english_analysis(
+        topic_cards, monthly_reuse_logs, m_score_c
+    )
+else:
+    m_english_overall, m_english_retention, m_english_priority = "", "", []
 # ── ▲ 英語学習AI分析実行ここまで ─────────────────
 
 
@@ -1695,7 +1704,7 @@ def generate_weekly_comment(
         res = requests.post(
             "https://api.anthropic.com/v1/messages",
             headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 3000, "messages": [{"role": "user", "content": prompt}]},
+            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1000, "messages": [{"role": "user", "content": prompt}]},
             timeout=30,
         )
         text = res.json()["content"][0]["text"].strip()
@@ -1758,7 +1767,7 @@ def generate_monthly_comment(
         res = requests.post(
             "https://api.anthropic.com/v1/messages",
             headers={"x-api-key": ANTHROPIC_API_KEY, "anthropic-version": "2023-06-01", "content-type": "application/json"},
-            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 4000, "messages": [{"role": "user", "content": prompt}]},
+            json={"model": "claude-haiku-4-5-20251001", "max_tokens": 1500, "messages": [{"role": "user", "content": prompt}]},
             timeout=30,
         )
         text = res.json()["content"][0]["text"].strip()
@@ -1844,10 +1853,13 @@ m_english_panel_html = make_english_panel_html(
 )
 # ── ▲ 英語分析パネルHTML ここまで ──────────────────
 
-monthly_summaries, monthly_analysis = generate_monthly_comment(
-    m_score_w, m_score_c, m_score_ca, m_score_i, m_score_total,
-    m_weight_avg, m_sleep_avg, m_cond_summary, m_task_done_count,
-)
+if RUN_MONTHLY:
+    monthly_summaries, monthly_analysis = generate_monthly_comment(
+        m_score_w, m_score_c, m_score_ca, m_score_i, m_score_total,
+        m_weight_avg, m_sleep_avg, m_cond_summary, m_task_done_count,
+    )
+else:
+    monthly_summaries, monthly_analysis = [], ""
 
 monthly_comment_html = ""
 if monthly_summaries or monthly_analysis:
@@ -1971,10 +1983,13 @@ w_judge_colors = {
 }
 w_judge_text_c, w_judge_border = w_judge_colors[w_judge_color]
 
-weekly_summaries, weekly_analysis = generate_weekly_comment(
-    w_score_w, w_score_c, w_score_ca, w_score_i, w_score_total,
-    w_weight_avg, w_sleep_avg, w_cond_summary, task_done_count,
-)
+if RUN_WEEKLY:
+    weekly_summaries, weekly_analysis = generate_weekly_comment(
+        w_score_w, w_score_c, w_score_ca, w_score_i, w_score_total,
+        w_weight_avg, w_sleep_avg, w_cond_summary, task_done_count,
+    )
+else:
+    weekly_summaries, weekly_analysis = [], ""
 
 weekly_comment_html = ""
 if weekly_summaries or weekly_analysis:

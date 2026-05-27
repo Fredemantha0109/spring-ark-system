@@ -2,6 +2,12 @@ name: Spring Ark Scoring System
 on:
   repository_dispatch:
     types: [trigger_scoring]
+  schedule:
+    # 毎週月曜 SGT 6:00 (UTC 日曜 22:00) — Weekly分析あり
+    - cron: '0 22 * * 0'
+    # 毎月2日 SGT 6:00 (UTC 1日 22:00) — Monthly分析あり
+    - cron: '0 22 1 * *'
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -47,6 +53,10 @@ jobs:
           TRAINING_DATABASE_ID: ${{ secrets.TRAINING_DATABASE_ID }}
           TOPIC_CARD_DATABASE_ID: ${{ secrets.TOPIC_CARD_DATABASE_ID }}
           REUSE_LOG_DATABASE_ID: ${{ secrets.REUSE_LOG_DATABASE_ID }}
+          # Weekly分析: 月曜スケジュール時のみ true
+          RUN_WEEKLY: ${{ github.event.schedule == '0 22 * * 0' && 'true' || 'false' }}
+          # Monthly分析: 毎月1日スケジュール時のみ true
+          RUN_MONTHLY: ${{ github.event.schedule == '0 22 1 * *' && 'true' || 'false' }}
         run: python generate_dashboard.py
       - name: Send LINE notification
         env:
