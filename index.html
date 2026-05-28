@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SPRING ARK | 習慣化支援ダッシュボード</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Noto+Sans+JP:wght@300;400;500;700&display=swap" rel="stylesheet" />
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --bg-base:    #0a0f1e;
+      --bg-card:    #111827;
+      --bg-card2:   #0d1525;
+      --border:     #1e2d45;
+      --green:      #4ade80;
+      --yellow:     #facc15;
+      --cyan:       #22d3ee;
+      --text:       #e2e8f0;
+      --text-muted: #64748b;
+      --text-dim:   #94a3b8;
+      --font-mono:  'Space Mono', monospace;
+      --font-jp:    'Noto Sans JP', sans-serif;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      background-color: var(--bg-base);
+      color: var(--text);
+      font-family: var(--font-jp);
+      line-height: 1.7;
+      min-height: 100vh;
+    }
+
+    /* ─── Layout ─── */
+    .page {
+      max-width: 1400px;
+      margin: 0 auto;
+      padding: 0 48px 80px;
+    }
+
+    section {
+      margin-top: 80px;
+    }
+    section:first-of-type {
+      margin-top: 24px;
+    }
+
+    .section-title {
+      font-family: var(--font-mono);
+      font-size: 1rem;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      color: var(--cyan);
+      margin-bottom: 20px;
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .section-title::after {
+      content: '';
+      flex: 1;
+      height: 1px;
+      background: var(--border);
+    }
+
+    .card {
+      background: var(--bg-card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 28px;
+    }
+
+    /* ─── Section ①: Hero ─── */
+    .hero {
+      text-align: center;
+      padding: 40px 20px 40px;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background:
+        radial-gradient(ellipse 60% 40% at 50% 0%, rgba(34,211,238,.08) 0%, transparent 70%),
+        radial-gradient(ellipse 40% 30% at 20% 80%, rgba(74,222,128,.06) 0%, transparent 60%);
+      pointer-events: none;
+    }
+    .hero-eyebrow {
+      font-family: var(--font-mono);
+      font-size: 0.9rem;
+      letter-spacing: 0.15em;
+      color: var(--cyan);
+      text-transform: uppercase;
+      margin-bottom: 20px;
+    }
+    .hero-title {
+      font-family: var(--font-mono);
+      font-size: clamp(2rem, 6.5vw, 4.2rem);
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      line-height: 1;
+      background: linear-gradient(135deg, var(--green) 0%, var(--cyan) 50%, #818cf8 100%);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 18px;
+    }
+    .hero-subtitle {
+      font-size: 1.3rem;
+      color: var(--text-dim);
+      margin-bottom: 10px;
+      letter-spacing: 0.02em;
+    }
+    .hero-name {
+      font-family: var(--font-mono);
+      font-size: 1.1rem;
+      color: var(--yellow);
+      letter-spacing: 0.15em;
+    }
+    .hero-dots {
+      display: flex;
+      justify-content: center;
+      gap: 8px;
+      margin-top: 12px;
+      margin-bottom: 12px;
+    }
+    .hero-dot {
+      width: 6px;
+      height: 6px;
+      border-radius: 50%;
+    }
+    .hero-dot:nth-child(1) { background: var(--green); }
+    .hero-dot:nth-child(2) { background: var(--yellow); }
+    .hero-dot:nth-child(3) { background: var(--cyan); }
+
+    /* ─── Section ②: Screenshot Tabs ─── */
+    .tab-bar {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 20px;
+    }
+    .tab-btn {
+      font-family: var(--font-mono);
+      font-size: 1rem;
+      letter-spacing: 0.1em;
+      padding: 12px 24px;
+      border-radius: 6px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text-muted);
+      cursor: pointer;
+      transition: all 0.2s ease;
+    }
+    .tab-btn:hover {
+      color: var(--text);
+      border-color: #2d3f5e;
+      background: rgba(255,255,255,0.1);
+      cursor: pointer;
+    }
+    .tab-btn.active {
+      background: rgba(74,222,128,.1);
+      border-color: var(--green);
+      color: var(--green);
+    }
+
+    .tab-panel {
+      display: none;
+    }
+    .tab-panel.active {
+      display: block;
+    }
+
+    .screenshot-wrap {
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      background: #060c18;
+    }
+    .screenshot-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 10px 14px;
+      background: #0d1525;
+      border-bottom: 1px solid var(--border);
+    }
+    .dot-red   { width:10px;height:10px;border-radius:50%;background:#ef4444; }
+    .dot-yellow{ width:10px;height:10px;border-radius:50%;background:#f59e0b; }
+    .dot-green { width:10px;height:10px;border-radius:50%;background:#22c55e; }
+    .screenshot-url {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      margin-left: 8px;
+    }
+
+    .screenshot-wrap img {
+      width: 100%;
+      display: block;
+      height: auto;
+    }
+
+    .screenshot-placeholder {
+      width: 100%;
+      aspect-ratio: 16/9;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      gap: 16px;
+      background: repeating-linear-gradient(
+        45deg,
+        transparent,
+        transparent 20px,
+        rgba(255,255,255,.015) 20px,
+        rgba(255,255,255,.015) 40px
+      );
+    }
+    .placeholder-icon {
+      font-size: 2.8rem;
+      opacity: 0.25;
+    }
+    .placeholder-label {
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      letter-spacing: 0.3em;
+      text-transform: uppercase;
+      color: var(--text-muted);
+      opacity: 0.6;
+    }
+    .placeholder-coming {
+      font-family: var(--font-mono);
+      font-size: 1.1rem;
+      font-weight: 700;
+      letter-spacing: 0.15em;
+      color: var(--text-dim);
+    }
+
+    /* ─── Section ③: System Flow ─── */
+    .flow-grid {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr auto 1fr auto 1fr;
+      grid-template-rows: 1fr auto;
+      gap: 16px;
+    }
+
+    .flow-desc {
+      font-size: 0.82rem;
+      color: rgba(255,255,255,0.85);
+      line-height: 1.75;
+      padding: 4px 4px 0;
+    }
+    .flow-desc-item {
+      padding-left: 1.2em;
+      text-indent: -1.2em;
+      margin-bottom: 4px;
+    }
+    .flow-desc-item:last-child { margin-bottom: 0; }
+
+    .flow-arrow {
+      font-family: var(--font-mono);
+      font-size: 2rem;
+      font-weight: bold;
+      color: var(--green);
+      text-align: center;
+      padding: 0 8px;
+      text-shadow: 0 0 14px rgba(74,222,128,.5);
+      align-self: center;
+    }
+
+    .flow-card {
+      background: var(--bg-card2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      justify-content: flex-start;
+      gap: 16px;
+    }
+
+    .flow-num {
+      font-family: var(--font-mono);
+      font-size: 1rem;
+      color: var(--text-muted);
+      letter-spacing: 0.15em;
+    }
+
+    .flow-label {
+      font-size: 0.9rem;
+      font-weight: 500;
+      letter-spacing: 0.1em;
+      padding: 4px 10px;
+      border-radius: 4px;
+      display: inline-block;
+      width: fit-content;
+    }
+    .flow-card:nth-child(1) .flow-label { background: rgba(74,222,128,.12);  color: var(--green); }
+    .flow-card:nth-child(3) .flow-label { background: rgba(250,204,21,.12);  color: var(--yellow); }
+    .flow-card:nth-child(5) .flow-label { background: #7c2d12; color: #fb923c; }
+    .flow-card:nth-child(7) .flow-label { background: rgba(129,140,248,.12); color: #818cf8; }
+
+    .flow-heading {
+      font-family: var(--font-mono);
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.5;
+    }
+
+    .flow-body {
+      font-size: 0.95rem;
+      color: rgba(255,255,255,0.9);
+      line-height: 1.8;
+    }
+
+    .flow-tag {
+      display: inline-block;
+      font-family: var(--font-mono);
+      font-size: 0.85rem;
+      padding: 3px 8px;
+      border-radius: 3px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.3);
+      color: white;
+      margin: 3px 3px 0 0;
+    }
+    .flow-tag.dim { color: rgba(255,255,255,0.5); }
+
+    .flow-reason {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      line-height: 1.7;
+      border-top: 1px solid var(--border);
+      padding-top: 12px;
+      margin-top: auto;
+    }
+
+    /* ─── Section ④: Points ─── */
+    .points-grid {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 24px;
+    }
+
+    .point-card {
+      background: var(--bg-card2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 2rem;
+      display: flex;
+      flex-direction: column;
+      gap: 18px;
+      transition: border-color 0.2s;
+    }
+    .point-card:hover { border-color: #2d4060; }
+
+    .point-header {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+    }
+    .point-icon {
+      font-size: 1.6rem;
+      line-height: 1;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .point-title {
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: var(--text);
+      line-height: 1.4;
+    }
+
+    .point-list {
+      list-style: none;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+    .point-list li {
+      font-size: 1rem;
+      color: rgba(255,255,255,0.9);
+      line-height: 1.75;
+      padding-left: 18px;
+      position: relative;
+    }
+    .point-list li::before {
+      content: '▸';
+      position: absolute;
+      left: 0;
+      color: var(--text-muted);
+      font-size: 0.7rem;
+      top: 5px;
+    }
+
+    .accent-green { color: var(--green); }
+    .accent-yellow { color: var(--yellow); }
+    .accent-cyan { color: var(--cyan); }
+    .accent-white { color: #ffffff; font-weight: 600; }
+
+    .challenge-list {
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+    }
+    .challenge-row {
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      gap: 14px;
+      align-items: center;
+    }
+    .challenge-problem {
+      font-size: 1rem;
+      color: var(--yellow);
+      line-height: 1.65;
+    }
+    .challenge-problem strong {
+      display: block;
+      font-size: 0.8rem;
+      letter-spacing: 0.05em;
+      margin-bottom: 3px;
+      opacity: 0.8;
+    }
+    .challenge-arrow {
+      font-family: var(--font-mono);
+      font-size: 1.3rem;
+      font-weight: bold;
+      color: var(--green);
+      text-align: center;
+      text-shadow: 0 0 10px rgba(74,222,128,.4);
+      flex-shrink: 0;
+      line-height: 1;
+      align-self: center;
+    }
+    .challenge-arrow::before {
+      content: '→';
+    }
+    .challenge-solution {
+      font-size: 1rem;
+      color: rgba(255,255,255,0.9);
+      line-height: 1.65;
+    }
+
+    @media (max-width: 768px) {
+      .challenge-row {
+        grid-template-columns: 1fr;
+        gap: 8px;
+      }
+      .challenge-arrow {
+        font-size: 1.1rem;
+      }
+      .challenge-arrow::before {
+        content: '↓';
+      }
+    }
+
+    .point-list li.highlight {
+      background: transparent;
+      border: none;
+      border-left: 3px solid #4ade80;
+      border-radius: 0;
+      padding: 12px 14px 12px 30px;
+      font-size: 1.05rem;
+      color: rgba(255,255,255,0.9);
+    }
+    .point-list li.highlight::before {
+      color: var(--green);
+      top: 14px;
+    }
+
+    /* ─── Footer ─── */
+    .footer {
+      margin-top: 80px;
+      border-top: 1px solid var(--border);
+      padding-top: 28px;
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 0.65rem;
+      color: var(--text-muted);
+      letter-spacing: 0.1em;
+    }
+
+    /* ─── Responsive ─── */
+    @media (max-width: 700px) {
+      .flow-grid {
+        grid-template-columns: 1fr;
+        grid-template-rows: auto;
+        gap: 0;
+      }
+      .flow-arrow {
+        transform: rotate(90deg);
+        font-size: 1.4rem;
+        padding: 8px 0;
+      }
+      .hero-title {
+        font-size: clamp(2.5rem, 15vw, 4rem);
+      }
+    }
+
+    @media (max-width: 480px) {
+      .card { padding: 20px 16px; }
+      .point-card { padding: 22px 18px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="page">
+
+  <!-- ① Hero -->
+  <div class="hero">
+    <p class="hero-eyebrow">AI Driven School — 4月課題</p>
+    <h1 class="hero-title">SPRING ARK</h1>
+    <p class="hero-subtitle">習慣化支援ダッシュボード</p>
+    <p class="hero-name">by Yuichiro</p>
+  </div>
+
+  <!-- ② Screenshots -->
+  <section>
+    <p class="section-title">DASHBOARD PREVIEW</p>
+    <div class="card">
+      <div class="tab-bar">
+        <button id="img-tab-daily"   class="tab-btn active" data-tab="daily">Daily</button>
+        <button id="img-tab-weekly"  class="tab-btn"        data-tab="weekly">Weekly</button>
+        <button id="img-tab-monthly" class="tab-btn"        data-tab="monthly">Monthly</button>
+      </div>
+
+      <div class="tab-panel active" id="tab-daily">
+        <div class="screenshot-wrap">
+          <div class="screenshot-bar">
+            <div class="dot-red"></div>
+            <div class="dot-yellow"></div>
+            <div class="dot-green"></div>
+            <span class="screenshot-url">spring-ark.surge.sh — Daily View</span>
+          </div>
+          <img src="./daily.png" alt="Daily Dashboard" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
+          <div class="screenshot-placeholder" style="display:none">
+            <div class="placeholder-icon">📊</div>
+            <div class="placeholder-coming">Coming Soon</div>
+            <div class="placeholder-label">daily.png</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="tab-weekly">
+        <div class="screenshot-wrap">
+          <div class="screenshot-bar">
+            <div class="dot-red"></div>
+            <div class="dot-yellow"></div>
+            <div class="dot-green"></div>
+            <span class="screenshot-url">spring-ark.surge.sh — Weekly View</span>
+          </div>
+          <img src="./weekly.png" alt="Weekly Dashboard" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
+          <div class="screenshot-placeholder" style="display:none">
+            <div class="placeholder-icon">📅</div>
+            <div class="placeholder-coming">Coming Soon</div>
+            <div class="placeholder-label">weekly.png</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="tab-panel" id="tab-monthly">
+        <div class="screenshot-wrap">
+          <div class="screenshot-bar">
+            <div class="dot-red"></div>
+            <div class="dot-yellow"></div>
+            <div class="dot-green"></div>
+            <span class="screenshot-url">spring-ark.surge.sh — Monthly View</span>
+          </div>
+          <img src="./monthly.png" alt="Monthly Dashboard" onerror="this.style.display='none';this.nextElementSibling.style.display='flex'" />
+          <div class="screenshot-placeholder" style="display:none">
+            <div class="placeholder-icon">🗓</div>
+            <div class="placeholder-coming">Coming Soon</div>
+            <div class="placeholder-label">monthly.png</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ③ System Flow -->
+  <section>
+    <p class="section-title">SYSTEM FLOW</p>
+    <div class="card">
+      <div class="flow-grid">
+
+        <!-- Row 1: Cards -->
+        <!-- 1: Trigger -->
+        <div class="flow-card">
+          <span class="flow-num">01</span>
+          <span class="flow-label">トリガー</span>
+          <div class="flow-body">
+            <div style="margin-bottom:10px">
+              <span class="flow-tag">毎朝</span>
+              <div style="display:flex; align-items:baseline; gap:4px; margin-top:4px">
+                <span style="flex-shrink:0; min-width:1.4em; opacity:0.7">①</span>
+                <span>iPhoneショートカット実行</span>
+              </div>
+            </div>
+            <div style="margin-bottom:10px">
+              <span class="flow-tag">随時</span>
+              <div style="display:flex; align-items:baseline; gap:4px; margin-top:4px">
+                <span style="flex-shrink:0; min-width:1.4em; opacity:0.7">②</span>
+                <span>タスク完了チェック（Streamlit）</span>
+              </div>
+            </div>
+            <div>
+              <span class="flow-tag">毎週日曜 5:00</span>
+              <div style="display:flex; align-items:baseline; gap:4px; margin-top:4px">
+                <span style="flex-shrink:0; min-width:1.4em; opacity:0.7">③</span>
+                <span>GitHub Actions 起動→翌週タスク自動生成</span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="flow-arrow">→</div>
+
+        <!-- 2: Source -->
+        <div class="flow-card">
+          <span class="flow-num">02</span>
+          <span class="flow-label">ソース元</span>
+          <div class="flow-heading">Notion</div>
+          <div class="flow-body">
+            <span class="flow-tag dim">体重</span>
+            <span class="flow-tag dim">体調</span>
+            <span class="flow-tag dim">睡眠</span>
+            <span class="flow-tag dim">タスク実績</span>
+            <span class="flow-tag dim">カレンダー</span>
+            <span class="flow-tag dim">ジャーナリング</span>
+          </div>
+        </div>
+
+        <div class="flow-arrow">→</div>
+
+        <!-- 3: Processing -->
+        <div class="flow-card">
+          <span class="flow-num">03</span>
+          <span class="flow-label">処理</span>
+          <div class="flow-heading">GitHub Actions<br>+ Python</div>
+          <div class="flow-body">
+            <div>スコア計算</div>
+            <div>HTML 生成</div>
+            <div>Claude API で推奨作戦を生成</div>
+          </div>
+        </div>
+
+        <div class="flow-arrow">→</div>
+
+        <!-- 4: Delivery -->
+        <div class="flow-card">
+          <span class="flow-num">04</span>
+          <span class="flow-label">届ける先</span>
+          <div class="flow-heading">Surge + LINE</div>
+          <div class="flow-body">
+            <div style="margin-bottom:10px">
+              <span class="flow-tag">Surge</span><br>
+              HTMLダッシュボード公開
+            </div>
+            <div>
+              <span class="flow-tag">LINE</span><br>
+              プッシュ通知で受け取る
+            </div>
+          </div>
+        </div>
+
+        <!-- Row 2: Descriptions -->
+        <div class="flow-desc">
+          <div class="flow-desc-item">1. 体重計測後にショートカット実行。<br>起床直後のルーティンで忘れない</div>
+          <div class="flow-desc-item">2. Streamlitアプリをホーム画面に追加。<br>完了チェック→Notionに即反映</div>
+          <div class="flow-desc-item">3. 自動生成から微調整するだけで完了。毎週の計画作成工数が大幅削減</div>
+        </div>
+        <div></div>
+        <div class="flow-desc">日々の記録をすでに Notion で管理していたため、データの移行不要でそのまま連携できた</div>
+        <div></div>
+        <div class="flow-desc">スコア計算・AI分析・HTML生成まで一箇所で完結。無料で使えてコードで管理できるためエラーも追いやすい</div>
+        <div></div>
+        <div class="flow-desc">LINE に届くので iPhone でいつでも確認できる。移動中でも場所を選ばず今日の作戦を把握できる</div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- ④ Points -->
+  <section>
+    <p class="section-title">POINTS OF FOCUS</p>
+    <div class="points-grid">
+
+      <!-- ① デザインの工夫 -->
+      <div class="point-card">
+        <div class="point-header">
+          <div class="point-icon">🎨</div>
+          <div class="point-title">デザインの工夫</div>
+        </div>
+        <ul class="point-list">
+          <li><span class="accent-green">3つの時間軸：</span>Daily / Weekly / Monthly のタブ切り替えで3つの視点から振り返りが可能</li>
+          <li><span class="accent-green">個別AI分析：</span>Weekly・Monthly に英語・ジャーナル・筋トレの個別トピックごとの AI 分析タブを追加</li>
+          <li><span class="accent-green">自動判定：</span>コンディション「良好／普通／要改善」は体調の自己評価と睡眠時間をもとに、「余裕日／普通日／多忙日」はカレンダーの合計時間から自動で判定して表示</li>
+          <li><span class="accent-green">点数表示：</span>スコアをパーセントではなく点数で表示。60%より<strong>60点</strong>の方が前向きになれる</li>
+        </ul>
+      </div>
+
+      <!-- ② ぶつかった課題 -->
+      <div class="point-card">
+        <div class="point-header">
+          <div class="point-icon">⚡</div>
+          <div class="point-title">ぶつかった課題</div>
+        </div>
+        <div class="challenge-list">
+          <div class="challenge-row">
+            <div class="challenge-problem">
+              <strong>AIの選択</strong>
+              Gemini でiPhoneショートカット開発。同じエラーがループして前に進めない
+            </div>
+            <div class="challenge-arrow"></div>
+            <div class="challenge-solution">Claude に切り替えで解決。作業時間が体感半分に</div>
+          </div>
+          <div class="challenge-row">
+            <div class="challenge-problem">
+              <strong>並行開発の混乱</strong>
+              複数チャットで並行開発。コードが競合して管理不能に
+            </div>
+            <div class="challenge-arrow"></div>
+            <div class="challenge-solution">git ブランチを実践投入。変更履歴が追えて混乱が解消</div>
+          </div>
+          <div class="challenge-row">
+            <div class="challenge-problem">
+              <strong>肥大化</strong>
+              機能を追加しすぎてダッシュボードが見づらくなり、開くのが億劫で本末転倒
+            </div>
+            <div class="challenge-arrow"></div>
+            <div class="challenge-solution">「朝一目でわかる」原点に立ち返り、機能を削ぎ落としてシンプルに整理</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ③ やってみて気づいたこと -->
+      <div class="point-card">
+        <div class="point-header">
+          <div class="point-icon">💡</div>
+          <div class="point-title">やってみて気づいたこと</div>
+        </div>
+        <ul class="point-list">
+          <li><span class="accent-white">設計が先：</span>バグを潰し続けるより「何を表示すべきか」を問い直す方が、問題解決の近道になる</li>
+          <li><span class="accent-white">AIは何を使うかで体験が全然違う：</span>Gemini → Claude 切り替えで作業時間が体感半分に</li>
+          <li><span class="accent-white">足し算と引き算：</span>機能を追加することと削ぎ落とすことは同じくらい重要。洗練されたプロダクトは、何を入れるかより何を入れないかで決まる</li>
+          <li><span class="accent-white">言語化が鍵：</span>日々の困りごとをしっかり言語化してAIに的確に伝えられるかどうかが、アウトプットの質を決める</li>
+          <li class="highlight"><span class="accent-green">自分専用が最強：</span>この完成形をそのまま渡されても他の人には使いこなせない。大事なのは自分の困りごとを自分専用のアプリとして作ること。それが最大限の効果を生む。そういう時代がもう来ている。</li>
+        </ul>
+      </div>
+
+    </div>
+  </section>
+
+  <!-- Footer -->
+  <div class="footer">
+    <p>SPRING ARK — AI Driven School 4月課題 &nbsp;|&nbsp; Built with GitHub Actions + Python + Claude API</p>
+  </div>
+
+</div>
+
+<script>
+  const imgTabIds = ['img-tab-daily', 'img-tab-weekly', 'img-tab-monthly'];
+  const imgTabs   = imgTabIds.map(id => document.getElementById(id));
+  const panels    = document.querySelectorAll('.tab-panel');
+
+  imgTabs.forEach(btn => {
+    btn.addEventListener('click', () => {
+      const target = btn.dataset.tab;
+
+      imgTabs.forEach(b => b.classList.remove('active'));
+      panels.forEach(p => p.classList.remove('active'));
+
+      btn.classList.add('active');
+      document.getElementById('tab-' + target).classList.add('active');
+    });
+  });
+</script>
+
+</body>
+</html>
