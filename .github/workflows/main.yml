@@ -2,13 +2,6 @@ name: Spring Ark Scoring System
 on:
   repository_dispatch:
     types: [trigger_scoring]
-  schedule:
-    # 火〜日 SGT 6:00 (UTC 22:00) — Daily分析のみ
-    - cron: '0 22 * * 1-6'
-    # 毎週月曜 SGT 6:00 (UTC 日曜 22:00) — Weekly分析あり
-    - cron: '0 22 * * 0'
-    # 毎月2日 SGT 6:00 (UTC 1日 22:00) — Monthly分析あり
-    - cron: '0 22 1 * *'
 
 jobs:
   build:
