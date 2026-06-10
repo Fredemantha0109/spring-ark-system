@@ -1967,7 +1967,31 @@ if monthly_summaries or monthly_analysis:
         '</script>'
     )
 else:
-    monthly_comment_html = '<p class="text-xs text-ark-muted text-center py-4">月次分析データがありません</p>'
+    monthly_comment_html = (
+        '<div class="stripe bg-ark-card border border-violet-500/20 rounded-2xl p-4 glow-violet">'
+        '<div class="flex items-center justify-between mb-4">'
+        '<div class="inline-flex bg-ark-dim rounded-full p-0.5 gap-0.5">'
+        '<button id="m-tab-english" onclick="switchMTab(\'english\')" '
+        'class="m-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border">'
+        '📊 英語</button>'
+        '<button id="m-tab-training" onclick="switchMTab(\'training\')" '
+        'class="m-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted">'
+        '💪 筋トレ</button>'
+        '</div></div>'
+        '<div id="m-panel-english">' + m_english_panel_html + '</div>'
+        '<div id="m-panel-training" style="display:none">' + monthly_training_html + '</div>'
+        '</div>'
+        '<script>'
+        'function switchMTab(t){'
+        '  var ON="m-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border";'
+        '  var OFF="m-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted";'
+        '  document.getElementById("m-panel-english").style.display=t==="english"?"":"none";'
+        '  document.getElementById("m-panel-training").style.display=t==="training"?"":"none";'
+        '  document.getElementById("m-tab-english").className=t==="english"?ON:OFF;'
+        '  document.getElementById("m-tab-training").className=t==="training"?ON:OFF;'
+        '}'
+        '</script>'
+    )
 
 if w_score_total >= 80:
     w_judge_label, w_judge_color = "🏻絶好調", "green"
@@ -2083,7 +2107,31 @@ if weekly_summaries or weekly_analysis:
         '</script>'
     )
 else:
-    weekly_comment_html = '<p class="text-xs text-ark-muted text-center py-4">週次分析データがありません</p>'
+    weekly_comment_html = (
+        '<div class="stripe bg-ark-card border border-violet-500/20 rounded-2xl p-4 glow-violet">'
+        '<div class="flex items-center justify-between mb-4">'
+        '<div class="inline-flex bg-ark-dim rounded-full p-0.5 gap-0.5">'
+        '<button id="w-tab-english" onclick="switchWTab(\'english\')" '
+        'class="w-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border">'
+        '📊 英語</button>'
+        '<button id="w-tab-training" onclick="switchWTab(\'training\')" '
+        'class="w-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted">'
+        '💪 筋トレ</button>'
+        '</div></div>'
+        '<div id="w-panel-english">' + w_english_panel_html + '</div>'
+        '<div id="w-panel-training" style="display:none">' + weekly_training_html + '</div>'
+        '</div>'
+        '<script>'
+        'function switchWTab(t){'
+        '  var ON="w-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border";'
+        '  var OFF="w-tab-btn text-[10px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted";'
+        '  document.getElementById("w-panel-english").style.display=t==="english"?"":"none";'
+        '  document.getElementById("w-panel-training").style.display=t==="training"?"":"none";'
+        '  document.getElementById("w-tab-english").className=t==="english"?ON:OFF;'
+        '  document.getElementById("w-tab-training").className=t==="training"?ON:OFF;'
+        '}'
+        '</script>'
+    )
 
 
 def weekly_task_card(name, subtitle, icon_svg, color, score, task_rows_list):
