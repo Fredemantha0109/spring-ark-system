@@ -1,9 +1,9 @@
 import streamlit as st
 import requests
-from datetime import datetime
-from zoneinfo import ZoneInfo
 
-st.set_page_config(page_title="ARK Dashboard", page_icon="🌿", layout="centered", initial_sidebar_state="collapsed")
+from ark_config import ARK_NAME, CATEGORIES, category_display, today_jst
+
+st.set_page_config(page_title=f"{ARK_NAME} Dashboard", page_icon="☀️", layout="centered", initial_sidebar_state="collapsed")
 
 st.markdown("""
 <style>
@@ -22,15 +22,8 @@ NOTION_TOKEN = st.secrets["NOTION_TOKEN"]
 DATABASE_ID  = st.secrets["DATABASE_ID"]
 HEADERS = {"Authorization": f"Bearer {NOTION_TOKEN}", "Notion-Version": "2022-06-28", "Content-Type": "application/json"}
 
-CATEGORIES = [
-    {"key": "W",  "plan_prop": "【W】予定タスク",  "actual_prop": "【W】実績",  "label": "Wellness"},
-    {"key": "C",  "plan_prop": "【C】予定タスク",  "actual_prop": "【C】実績",  "label": "Communication"},
-    {"key": "Ca", "plan_prop": "【Ca】予定タスク", "actual_prop": "【Ca】実績", "label": "Career"},
-    {"key": "I",  "plan_prop": "【I】予定タスク",  "actual_prop": "【I】実績",  "label": "Input"},
-]
-
 def get_today_str():
-    return datetime.now(ZoneInfo("Asia/Singapore")).strftime("%Y-%m-%d")
+    return today_jst()
 
 def fetch_today_page(today):
     resp = requests.post(
@@ -82,7 +75,7 @@ def save_plan_and_actuals(page_id, plans, actuals):
 def main():
     today = get_today_str()
     st.markdown(f'<p class="date-heading">{today}</p>', unsafe_allow_html=True)
-    st.markdown("## ARK Dashboard 🌿")
+    st.markdown(f"## {ARK_NAME} ☀️")
     st.divider()
 
     with st.spinner("Notionと同期中…"):
@@ -104,7 +97,6 @@ def main():
         for cat in CATEGORIES:
             st.session_state[f"tasks_{cat['key']}"]   = get_multiselect_names(page, cat["plan_prop"])
             st.session_state[f"actuals_{cat['key']}"] = set(get_multiselect_names(page, cat["actual_prop"]))
-            # Notionから選択肢を取得
             st.session_state[f"options_{cat['key']}"] = fetch_select_options(cat["plan_prop"])
 
     st.markdown("**今日のタスク**")
@@ -115,12 +107,11 @@ def main():
         actuals = st.session_state[f"actuals_{cat['key']}"]
         options = st.session_state[f"options_{cat['key']}"]
 
-        # 追加済みタスクと🔥ペアを除いた選択肢
         available = filter_available(options, tasks)
+        display_name = category_display(cat["key"])
 
-        st.markdown(f'<div class="category-label">{cat["label"]}</div>', unsafe_allow_html=True)
+        st.markdown(f'<div class="category-label">{display_name}</div>', unsafe_allow_html=True)
 
-        # タスク一覧（チェック＋削除）
         for task in list(tasks):
             col_chk, col_del = st.columns([5, 1])
             with col_chk:
@@ -135,7 +126,6 @@ def main():
                     actuals.discard(task)
                     st.rerun()
 
-        # タスク追加（Notionの選択肢からドロップダウン、なければテキスト入力）
         col_sel, col_add = st.columns([5, 1])
         if available:
             with col_sel:
@@ -152,7 +142,12 @@ def main():
                         st.rerun()
         else:
             with col_sel:
-                new_task = st.text_input("追加", key=f"input_{cat['key']}", label_visibility="collapsed", placeholder=f"{cat['label']}のタスクを追加…")
+                new_task = st.text_input(
+                    "追加",
+                    key=f"input_{cat['key']}",
+                    label_visibility="collapsed",
+                    placeholder=f"{display_name}のタスクを追加…",
+                )
             with col_add:
                 if st.button("＋", key=f"add_{cat['key']}"):
                     if new_task.strip() and new_task.strip() not in tasks:

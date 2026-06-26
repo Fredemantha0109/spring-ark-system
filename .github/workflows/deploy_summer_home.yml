@@ -1,0 +1,29 @@
+name: Deploy Summer Ark Home
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - index_summer.html
+      - .github/workflows/deploy_summer_home.yml
+  workflow_dispatch:
+    # 手動デプロイ用ボタン
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Install Surge
+        run: npm install -g surge
+
+      - name: Deploy index_summer.html to summer-ark.surge.sh
+        env:
+          SURGE_TOKEN: ${{ secrets.SURGE_TOKEN }}
+        run: |
+          mkdir -p _summer_site
+          cp index_summer.html _summer_site/index.html
+          npx surge _summer_site summer-ark.surge.sh --token "$SURGE_TOKEN"

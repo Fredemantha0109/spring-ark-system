@@ -1,7 +1,8 @@
 import os
 import requests
 import json
-from datetime import datetime, timezone, timedelta
+
+from ark_config import now_jst, today_jst, yesterday_jst
 
 def send_line_message(message: str) -> bool:
     token = os.environ.get("LINE_ACCESS_TOKEN")
@@ -34,10 +35,9 @@ if __name__ == "__main__":
     notion_token = os.environ.get("NOTION_TOKEN")
     database_id  = os.environ.get("DATABASE_ID")
 
-    # 日付(SGT = UTC+8) — 今日・昨日の2ページ使い分け
-    sgt       = timezone(timedelta(hours=8))
-    today     = datetime.now(sgt).strftime("%Y-%m-%d")
-    yesterday = (datetime.now(sgt) - timedelta(days=1)).strftime("%Y-%m-%d")
+    # 日付（JST）— 今日・昨日の2ページ使い分け
+    today     = today_jst()
+    yesterday = yesterday_jst()
 
     headers = {
         "Authorization": f"Bearer {notion_token}",

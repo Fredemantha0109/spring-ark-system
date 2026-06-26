@@ -10,7 +10,8 @@ client_payload に task_name と category (W/C/Ca/I) を受け取る。
 import os
 import sys
 import requests
-from datetime import datetime, timezone, timedelta
+
+from ark_config import today_jst
 
 NOTION_TOKEN = os.environ["NOTION_API_TOKEN"]
 DATABASE_ID  = os.environ["NOTION_DATABASE_ID"]
@@ -26,8 +27,7 @@ HEADERS = {
 PROP_KEY = f"\u3010{CATEGORY}\u3011\u4e88\u5b9a\u30bf\u30b9\u30af"  # 【X】予定タスク
 FIRE_TASK = f"\U0001f525{TASK_NAME}"  # 🔥タスク名
 
-sgt   = timezone(timedelta(hours=8))
-today = datetime.now(sgt).strftime("%Y-%m-%d")
+today = today_jst()
 
 # ── 今日のページを取得 ────────────────────────────
 res = requests.post(

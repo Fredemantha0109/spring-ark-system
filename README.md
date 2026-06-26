@@ -7,14 +7,14 @@
 
 ## 概要
 
-ARK（Spring Ark）は4つのカテゴリで日々の習慣を計測する:
+ARK（`ark_config.ARK_NAME` — 現シーズンは Summer Ark）は4つのカテゴリで日々の習慣を計測する:
 
 | カテゴリ | キー | 内容 |
 |---|---|---|
-| Wellness | W | 体調・運動・回復系の習慣 |
-| Communication | C | コミュニケーション系の習慣 |
-| Career | Ca | キャリア系の習慣 |
-| Input | I | 学習・インプット系の習慣 |
+| 🔁 Routine | W | トレーニング・TOEIC・振り返り |
+| 🏠 Belonging | C | 新生活基盤・人間関係・家族 |
+| 💼 Career | Ca | 収益基盤・起業の種まき |
+| 🤖 AI | I | AIスクール・frog・卒業制作 |
 
 Notionデータベース（体重・体調・睡眠・タスク実績・カレンダー・ジャーナリングを管理）の
 各日付ページに「【X】予定タスク」「【X】実績」プロパティ(multi_select)があり、これを起点に全処理が動く。
@@ -45,17 +45,21 @@ LINE: プッシュ通知
   カテゴリごとに予定タスクの追加/削除、実績のチェックを行い、Notionに保存する。
 - **index.html** — プロジェクト紹介ページ（Daily/Weekly/Monthlyダッシュボードのプレビュー、
   システムフロー図、開発の振り返りを掲載。spring-ark.surge.shで公開）
+- **index_summer.html** — Summer Ark紹介ページ。`index.html`はSpring Ark期の記録として保存、
+  summer-ark.surge.shで公開。
 
 ### 自動化スクリプト（GitHub Actions経由）
+- **ark_config.py** — Summer Arkコンテンツ定数の一元管理。柱名・絵文字・PROJECT_START、
+  TRAINING_TARGETS等を集約。
 - **force_priority.py** — 指定タスクに🔥マークを付けて該当カテゴリの予定タスクへ強制追加する。
   `client_payload`で`task_name`と`category`(W/C/Ca/I)を受け取り、`force_priority.yml`から呼ばれる。
   同名タスクがあれば置き換え、🔥済みなら何もしない(冪等)。
-- **force_shakti.py** — force_priorityの仕組みを使い、毎日自動でWellnessカテゴリに
+- **force_shakti.py** — force_priorityの仕組みを使い、毎日自動でRoutineカテゴリに
   「🔥シャクティマット昼寝25分」を強制追加する。シャクティマットでの昼寝による回復を習慣化する狙い。
 - **scoring.py / calc_score.py** — 実績データからスコアを計算する。コンディション
   （良好／普通／要改善）は体調自己評価と睡眠時間から、多忙度（余裕日／普通日／多忙日）は
   カレンダーの合計時間から自動判定する。
-- **generate_dashboard.py / generate_dashboard_english.py** — 日次ダッシュボードを生成する(日本語/英語版)。
+- **generate_dashboard.py** — 日次ダッシュボードを生成する。
   Claude APIによる推奨作戦の生成を含む。
 - **generate_weekly.py** — 週次レポートを生成する。
 - **send_line.py** — 生成したレポート/通知をLINEに送信する。
@@ -90,4 +94,4 @@ LINE: プッシュ通知
 
 ## 注意事項
 
-- タイムゾーンは現在 `Asia/Singapore`(UTC+8)で固定。2026年7月の日本帰国後はJST(UTC+9)への変更が必要。
+- タイムゾーンはJST(UTC+9)に統一済み（2026年7月13日のSummer Ark開始に伴い移行）。

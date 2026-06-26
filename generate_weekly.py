@@ -1,6 +1,8 @@
 import os
 import requests
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
+
+from ark_config import ARK_NAME, CATEGORIES, category_display, now_jst
 
 # Notion API設定
 NOTION_TOKEN = os.environ.get("NOTION_API_TOKEN")
@@ -12,46 +14,48 @@ HEADERS = {
 }
 
 # マスター・スケジュール定義（0:月曜 〜 6:日曜）
+# Summer Ark 柱定義: W=Routine(トレ・TOEIC・英語学習・振り返り) / C=Belonging(人間関係・家族)
+#                    Ca=Career(収益基盤・起業) / I=AI(AIスクール・frog・卒業制作)
 WEEKLY_TEMPLATE = {
     0: { # 月曜
-        "W": ["瞑想", "ジャーナリング", "ジム", "Shakti", "ウォーキング"],
-        "C": ["Scrambled", "SB（月定着）", "Reuse", "OP（月定着）", "語彙（月定着）", "リスニング（月定着）", "Youtube", "シャドーイング（月定着）", "瞬間英作文（月定着）", "定着学習（その他）"],
+        "W": ["瞑想", "ジャーナリング", "ジム", "Shakti", "ウォーキング", "Scrambled", "SB（月定着）", "Reuse", "OP（月定着）", "語彙（月定着）", "リスニング（月定着）", "Youtube", "シャドーイング（月定着）", "瞬間英作文（月定着）", "定着学習（その他）", "NewsPicks"],
+        "C": [],
         "Ca": [],
-        "I": ["NewsPicks"]
+        "I": []
     },
     1: { # 火曜
-        "W": ["瞑想", "ジャーナリング", "ジム", "Shakti", "ウォーキング"],
-        "C": ["ライアン", "SB（火）", "Reuse", "OP（火）", "語彙（火）", "リスニング（火）", "英会話", "瞬間英作文（火）", "Youtube", "語彙（水）", "リスニング（水）", "瞬間英作文（水）"],
+        "W": ["瞑想", "ジャーナリング", "ジム", "Shakti", "ウォーキング", "ライアン", "SB（火）", "Reuse", "OP（火）", "語彙（火）", "リスニング（火）", "英会話", "瞬間英作文（火）", "Youtube", "語彙（水）", "リスニング（水）", "瞬間英作文（水）", "NewsPicks"],
+        "C": [],
         "Ca": [],
-        "I": ["NewsPicks"]
+        "I": []
     },
     2: { # 水曜
-        "W": ["瞑想", "ジャーナリング", "ウォーキング", "Shakti"],
-        "C": ["Soccer", "SB（水）", "Reuse", "OP（水）", "Youtube"],
-        "Ca": ["AI学習①", "AI学習②"],
-        "I": ["NewsPicks"]
+        "W": ["瞑想", "ジャーナリング", "ウォーキング", "Shakti", "SB（水）", "Reuse", "OP（水）", "Youtube", "Soccer", "NewsPicks"],
+        "C": [],
+        "Ca": [],
+        "I": ["AI学習①", "AI学習②"]
     },
     3: { # 木曜
-        "W": ["瞑想", "ジャーナリング", "ジム", "Shakti", "ウォーキング"],
-        "C": ["Scrambled", "SB（木）", "Reuse", "OP（木）", "英会話", "語彙（木）", "リスニング（木）", "瞬間英作文（木）", "Youtube", "英会話振り返り"],
+        "W": ["瞑想", "ジャーナリング", "ジム", "Shakti", "ウォーキング", "Scrambled", "SB（木）", "Reuse", "OP（木）", "英会話", "語彙（木）", "リスニング（木）", "瞬間英作文（木）", "Youtube", "英会話振り返り", "NewsPicks"],
+        "C": [],
         "Ca": [],
-        "I": ["NewsPicks"]
+        "I": []
     },
     4: { # 金曜
-        "W": ["瞑想", "ジャーナリング", "ジム", "Shakti", "ウォーキング"],
-        "C": ["ライアン", "SB（金）", "Reuse", "OP（金）", "語彙（土）", "リスニング（土）", "瞬間英作文（土）", "Youtube"],
+        "W": ["瞑想", "ジャーナリング", "ジム", "Shakti", "ウォーキング", "ライアン", "SB（金）", "Reuse", "OP（金）", "語彙（土）", "リスニング（土）", "瞬間英作文（土）", "Youtube", "NewsPicks"],
+        "C": [],
         "Ca": [],
-        "I": ["NewsPicks"]
+        "I": []
     },
     5: { # 土曜
-        "W": ["ウォーキング"],
-        "C": ["SB（土）", "Reuse", "OP（土）", "OP（日定着）", "語彙（日定着）"],
+        "W": ["ウォーキング", "SB（土）", "Reuse", "OP（土）", "OP（日定着）", "語彙（日定着）", "NewsPicks"],
+        "C": [],
         "Ca": [],
-        "I": ["NewsPicks"]
+        "I": []
     },
     6: { # 日曜
-        "W": ["ウォーキング"],
-        "C": ["SB（日定着）", "リスニング（日定着）", "シャドーイング（日定着）", "瞬間英作文（日定着）"],
+        "W": ["ウォーキング", "SB（日定着）", "リスニング（日定着）", "シャドーイング（日定着）", "瞬間英作文（日定着）"],
+        "C": [],
         "Ca": [],
         "I": []
     }
@@ -68,10 +72,8 @@ def create_notion_page(date_str, tasks):
     
     # カテゴリの表示名（絵文字つきで見やすくしています）
     categories = [
-        ("W", "🏋️ Wellness"),
-        ("C", "🗣️ Communication"),
-        ("Ca", "💼 Career"),
-        ("I", "📥 Input")
+        (c["key"], category_display(c["key"]))
+        for c in CATEGORIES
     ]
     
     for key, title in categories:
@@ -118,13 +120,13 @@ def create_notion_page(date_str, tasks):
         print(response.text)
 
 def main():
-    today = datetime.now(timezone(timedelta(hours=8))) # シンガポール時間(SGT)
+    today = now_jst()
     days_ahead = 0 - today.weekday()
     if days_ahead <= 0:
         days_ahead += 7
     next_monday = today + timedelta(days=days_ahead)
 
-    print(f"🚀 SPRING ARK 週次プランナー自動生成を開始します。({next_monday.date()}の週)")
+    print(f"🚀 {ARK_NAME} 週次プランナー自動生成を開始します。({next_monday.date()}の週)")
 
     for i in range(7):
         target_date = next_monday + timedelta(days=i)
