@@ -2,7 +2,7 @@ import os
 import requests
 import json
 
-from ark_config import HABIT_CATEGORIES, compute_habit_scores, now_jst, today_jst, yesterday_jst
+from ark_config import HABIT_CATEGORIES, get_habit_scores_for_page, now_jst, today_jst, yesterday_jst
 
 def send_line_message(message: str) -> bool:
     token = os.environ.get("LINE_ACCESS_TOKEN")
@@ -119,9 +119,7 @@ if __name__ == "__main__":
     def get_tasks(key):
         return [t["name"] for t in props_yesterday.get(key, {}).get("multi_select", [])]
 
-    plan_w = get_tasks("【W】予定タスク")
-    done_w = get_tasks("【W】実績")
-    habit_scores, _, _, score_total = compute_habit_scores(plan_w, done_w)
+    _, habit_scores, _, _, score_total = get_habit_scores_for_page(props_yesterday)
 
     def fmt(s): return str(int(s)) if s is not None else "-"
 

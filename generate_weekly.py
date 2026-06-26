@@ -2,7 +2,32 @@ import os
 import requests
 from datetime import timedelta
 
-from ark_config import ARK_NAME, CATEGORIES, category_display, now_jst
+from ark_config import (
+    ARK_NAME,
+    CATEGORIES,
+    HABIT_CATEGORIES,
+    category_display,
+    classify_routine_subcategory,
+    now_jst,
+)
+
+_SUBCATEGORY_TO_HABIT_KEY = {c["subcategory"]: c["key"] for c in HABIT_CATEGORIES}
+_HABIT_PLAN_PROPS = {c["key"]: f"【{c['label']}】予定タスク" for c in HABIT_CATEGORIES}
+
+
+def split_routine_tasks(w_tasks):
+    """WEEKLY_TEMPLATE の Routine タスクを習慣4分類の予定タスク用バケットに振り分ける。"""
+    buckets = {c["key"]: [] for c in HABIT_CATEGORIES}
+    for task in w_tasks:
+        subcat = classify_routine_subcategory(task)
+        habit_key = _SUBCATEGORY_TO_HABIT_KEY.get(subcat)
+        if habit_key is None:
+            raise ValueError(
+                f"Routine task {task!r} is unclassified (subcategory={subcat!r}). "
+                "Update ark_config.ROUTINE_SUBCATEGORIES or WEEKLY_TEMPLATE."
+            )
+        buckets[habit_key].append(task)
+    return buckets
 
 # Notion API設定
 NOTION_TOKEN = os.environ.get("NOTION_API_TOKEN")
@@ -97,16 +122,21 @@ def create_notion_page(date_str, tasks):
                     }
                 })
 
+    habit_tasks = split_routine_tasks(tasks["W"])
+
     payload = {
         "parent": {"database_id": DATABASE_ID},
         "properties": {
             "Date": {
                 "title": [{"text": {"content": date_str}}]
             },
-            "【W】予定タスク": make_multi_select(tasks["W"]),
+            **{
+                _HABIT_PLAN_PROPS[key]: make_multi_select(habit_tasks[key])
+                for key in _HABIT_PLAN_PROPS
+            },
             "【C】予定タスク": make_multi_select(tasks["C"]),
             "【Ca】予定タスク": make_multi_select(tasks["Ca"]),
-            "【I】予定タスク": make_multi_select(tasks["I"])
+            "【I】予定タスク": make_multi_select(tasks["I"]),
         },
         # 本文エリア（children）に作成したブロックリストを渡す
         "children": children_blocks

@@ -180,6 +180,10 @@ HABIT_CATEGORIES = [
 
 HABIT_BY_KEY = {c["key"]: c for c in HABIT_CATEGORIES}
 
+HABIT_PLAN_PROPS = {c["key"]: f"【{c['label']}】予定タスク" for c in HABIT_CATEGORIES}
+HABIT_ACTUAL_PROPS = {c["key"]: f"【{c['label']}】実績" for c in HABIT_CATEGORIES}
+HABIT_SCORE_PROPS = {c["key"]: f"【{c['label']}】スコア" for c in HABIT_CATEGORIES}
+
 # AIプロンプト用: "MIND=瞑想・内省、PHYSICAL=運動、ENGLISH=英語学習、KNOWLEDGE=情報収集"
 _HABIT_PROMPT_DESCRIPTIONS = {
     "mind": "瞑想・内省",
@@ -230,19 +234,116 @@ def _page_w_tasks(props, key):
     return [t["name"] for t in props.get(key, {}).get("multi_select", [])]
 
 
+def _page_number_score(props, prop_name):
+    return props.get(prop_name, {}).get("number")
+
+
+def has_new_habit_plan_data(props) -> bool:
+    """新4分類のいずれかの【予定タスク】に値があれば True。"""
+    return any(
+        _page_w_tasks(props, HABIT_PLAN_PROPS[c["key"]])
+        for c in HABIT_CATEGORIES
+    )
+
+
+def get_habit_data_for_date(props):
+    """
+    日付ページの習慣4分類 plan/done を返す。
+
+    Returns:
+        (uses_new_props, plans, dones)
+        plans/dones: {habit_key: [task_name, ...]}
+    """
+    if has_new_habit_plan_data(props):
+        plans = {
+            c["key"]: _page_w_tasks(props, HABIT_PLAN_PROPS[c["key"]])
+            for c in HABIT_CATEGORIES
+        }
+        dones = {
+            c["key"]: _page_w_tasks(props, HABIT_ACTUAL_PROPS[c["key"]])
+            for c in HABIT_CATEGORIES
+        }
+        return True, plans, dones
+
+    plan_w = _page_w_tasks(props, "【W】予定タスク")
+    done_w = _page_w_tasks(props, "【W】実績")
+    plans = {
+        c["key"]: filter_tasks_by_subcategory(plan_w, c["subcategory"])
+        for c in HABIT_CATEGORIES
+    }
+    dones = {
+        c["key"]: filter_tasks_by_subcategory(done_w, c["subcategory"])
+        for c in HABIT_CATEGORIES
+    }
+    return False, plans, dones
+
+
+def get_habit_scores_for_page(props):
+    """
+    習慣4分類スコアを取得する。
+
+    新プロパティがある日は【X】スコアを優先読み込み。
+    ない日は【W】からキーワード分類してオンザフライ計算。
+
+    Returns:
+        (uses_new_props, scores, plans, dones, total)
+    """
+    uses_new, plans, dones = get_habit_data_for_date(props)
+
+    if uses_new:
+        from calc_score import calculate_category_score
+
+        scores = {}
+        for cat in HABIT_CATEGORIES:
+            key = cat["key"]
+            if not plans[key] and not dones[key]:
+                scores[key] = None
+                continue
+            stored = _page_number_score(props, HABIT_SCORE_PROPS[key])
+            scores[key] = (
+                stored if stored is not None else calculate_category_score(plans[key], dones[key])
+            )
+    else:
+        plan_w = _page_w_tasks(props, "【W】予定タスク")
+        done_w = _page_w_tasks(props, "【W】実績")
+        scores, plans, dones, _ = compute_habit_scores(plan_w, done_w)
+
+    valid = [s for s in scores.values() if s is not None]
+    total = round(sum(valid) / len(valid)) if valid else 0
+    return uses_new, scores, plans, dones, total
+
+
+def build_missed_habit_tasks_for_page(props):
+    """ページの習慣4分類未達タスクを返す（新プロパティ優先・フォールバック対応）。"""
+    uses_new, plans, dones = get_habit_data_for_date(props)
+    if uses_new:
+        label_by_key = {c["key"]: c["label"] for c in HABIT_CATEGORIES}
+        missed = []
+        for cat in HABIT_CATEGORIES:
+            key = cat["key"]
+            done_clean = {d.lstrip("🔥") for d in dones[key]}
+            for task in plans[key]:
+                clean = task.lstrip("🔥")
+                if clean not in done_clean:
+                    missed.append((clean, label_by_key[key]))
+        return missed
+
+    plan_w = _page_w_tasks(props, "【W】予定タスク")
+    done_w = _page_w_tasks(props, "【W】実績")
+    return build_missed_habit_tasks(plan_w, done_w)
+
+
 def habit_avg(pages):
-    """期間内の各日【W】タスクから習慣4分類の週/月平均スコアを算出。
+    """期間内の各日から習慣4分類の週/月平均スコアを算出。
 
     pages: [(date_str, properties), ...]
+    各日は新プロパティ優先・なければ【W】フォールバック。
     各分類は「予定タスクがあった日」のスコアのみ平均（0件の日は除外）。
     総合は期間内に1回でも予定があった分類のみで単純平均。
     """
     daily_scores = []
     for _, p in pages:
-        scores, _, _, _ = compute_habit_scores(
-            _page_w_tasks(p, "【W】予定タスク"),
-            _page_w_tasks(p, "【W】実績"),
-        )
+        _, scores, _, _, _ = get_habit_scores_for_page(p)
         daily_scores.append(scores)
 
     result = {}

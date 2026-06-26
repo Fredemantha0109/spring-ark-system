@@ -1,5 +1,5 @@
 """
-force_shakti.py — 今日のNotionページの【W】予定タスクに🔥Shaktiを強制追加する
+force_shakti.py — 今日のNotionページの【MIND】予定タスクに🔥Shaktiを強制追加する
 
 GitHub Actions (force_shakti.yml) から呼び出される。
 - 「Shakti」が既にあれば削除して「🔥Shakti」を追加
@@ -11,10 +11,11 @@ import os
 import sys
 import requests
 
-from ark_config import today_jst
+from ark_config import HABIT_PLAN_PROPS, today_jst
 
 NOTION_TOKEN = os.environ["NOTION_API_TOKEN"]
 DATABASE_ID  = os.environ["NOTION_DATABASE_ID"]
+PROP_KEY     = HABIT_PLAN_PROPS["mind"]  # 【MIND】予定タスク
 
 HEADERS = {
     "Authorization": f"Bearer {NOTION_TOKEN}",
@@ -39,9 +40,9 @@ page    = pages[0]
 page_id = page["id"]
 props   = page["properties"]
 
-# ── 現在の【W】予定タスクを取得 ───────────────────
-current_tasks = [t["name"] for t in props.get("【W】予定タスク", {}).get("multi_select", [])]
-print(f"[INFO] 現在の【W】予定タスク: {current_tasks}")
+# ── 現在の【MIND】予定タスクを取得 ─────────────────
+current_tasks = [t["name"] for t in props.get(PROP_KEY, {}).get("multi_select", [])]
+print(f"[INFO] 現在の{PROP_KEY}: {current_tasks}")
 
 # ── 既に🔥Shaktiが入っていれば何もしない ──────────
 if "\U0001f525Shakti" in current_tasks:
@@ -58,7 +59,7 @@ patch_res = requests.patch(
     headers=HEADERS,
     json={
         "properties": {
-            "\u3010W\u3011\u4e88\u5b9a\u30bf\u30b9\u30af": {
+            PROP_KEY: {
                 "multi_select": [{"name": t} for t in new_tasks]
             }
         }
@@ -66,7 +67,7 @@ patch_res = requests.patch(
 )
 
 if patch_res.status_code == 200:
-    print(f"[OK] 🔥Shakti を【W】予定タスクに追加しました: {new_tasks}")
+    print(f"[OK] 🔥Shakti を{PROP_KEY}に追加しました: {new_tasks}")
 else:
     print(f"[ERROR] PATCH失敗: {patch_res.status_code} {patch_res.text}")
     sys.exit(1)

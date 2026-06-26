@@ -1,6 +1,9 @@
 """
 calc_score.py — 昨日のカテゴリスコアを算出してNotionに書き込む
 
+4柱（W/C/Ca/I）に加え、習慣4分類（MIND/PHYSICAL/ENGLISH/KNOWLEDGE）の
+スコアも計算する。新4分類の予定・実績がともに空の日はスキップする。
+
 実行タイミング:
   朝のiOSショートカット → GitHub /dispatches (trigger_scoring)
   → main.yml 内で scoring.py の後に実行される
@@ -20,7 +23,7 @@ import os
 import sys
 import requests
 
-from ark_config import CATEGORIES as ARK_CATEGORIES, yesterday_jst
+from ark_config import CATEGORIES as ARK_CATEGORIES, HABIT_CATEGORIES, yesterday_jst
 
 # ── 環境変数 ────────────────────────────────────────────────────────────────
 NOTION_TOKEN = os.environ["NOTION_TOKEN"]
@@ -42,6 +45,17 @@ CATEGORIES = [
         "label": c["label"],
     }
     for c in ARK_CATEGORIES
+]
+
+HABIT_SCORE_CATEGORIES = [
+    {
+        "key": c["key"],
+        "plan_prop": f"【{c['label']}】予定タスク",
+        "actual_prop": f"【{c['label']}】実績",
+        "score_prop": f"【{c['label']}】スコア",
+        "label": c["label"],
+    }
+    for c in HABIT_CATEGORIES
 ]
 
 PRIORITY_EMOJI = "🔥"
@@ -99,6 +113,11 @@ def calculate_category_score(
     return round(min(score, 100.0), 1)
 
 
+def should_score_habit_category(plan_tasks: list[str], actual_tasks: list[str]) -> bool:
+    """新4分類: 予定・実績とも空ならスコア計算・書き込みをスキップする。"""
+    return bool(plan_tasks or actual_tasks)
+
+
 # ── Notion API ラッパー ─────────────────────────────────────────────────────
 
 def get_page_by_date(date_str: str) -> dict:
@@ -140,10 +159,10 @@ def update_page_scores(page_id: str, scores: dict[str, float]) -> None:
 
 def update_scores_for_date(date_str: str) -> dict:
     """
-    指定日のページを取得し、4カテゴリのスコアを計算してNotionに書き込む。
+    指定日のページを取得し、4柱 + 習慣4分類のスコアを計算してNotionに書き込む。
 
     Returns:
-        {"Wellness": 75.0, "Communication": None, ...} 形式
+        {"Routine": 75.0, "MIND": None, ...} 形式
     """
     page = get_page_by_date(date_str)
     if page is None:
@@ -162,6 +181,18 @@ def update_scores_for_date(date_str: str) -> dict:
         results[cat["label"]] = score
 
         # N/A(None)は書き込まない。それ以外は上書き
+        if score is not None:
+            scores_to_write[cat["score_prop"]] = score
+
+    for cat in HABIT_SCORE_CATEGORIES:
+        plan = get_multiselect_names(page, cat["plan_prop"])
+        actual = get_multiselect_names(page, cat["actual_prop"])
+        if not should_score_habit_category(plan, actual):
+            results[cat["label"]] = None
+            continue
+
+        score = calculate_category_score(plan, actual)
+        results[cat["label"]] = score
         if score is not None:
             scores_to_write[cat["score_prop"]] = score
 

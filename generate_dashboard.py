@@ -18,8 +18,9 @@ from ark_config import (
     CATEGORY_BY_KEY,
     HABIT_CATEGORIES,
     HABIT_PROMPT_LEGEND,
-    build_missed_habit_tasks,
-    compute_habit_scores,
+    build_missed_habit_tasks_for_page,
+    get_habit_data_for_date,
+    get_habit_scores_for_page,
     habit_avg,
     JST,
     LABEL_BY_KEY,
@@ -1042,7 +1043,7 @@ done_c  = get_tasks("【C】実績")
 done_ca = get_tasks("【Ca】実績")
 done_i  = get_tasks("【I】実績")
 
-habit_scores, habit_plans, habit_dones, habit_score_total = compute_habit_scores(plan_w, done_w)
+_, habit_scores, habit_plans, habit_dones, habit_score_total = get_habit_scores_for_page(props_yesterday)
 
 # 予定タスク0件のカテゴリはスコアを除外し、総合スコアを再計算（W/C/Ca/I — Weekly/Monthly等で引き続き使用）
 if len(plan_w)  == 0: score_w  = None
@@ -1052,7 +1053,7 @@ if len(plan_i)  == 0: score_i  = None
 _valid_scores = [s for s in [score_w, score_c, score_ca, score_i] if s is not None]
 score_total = round(sum(_valid_scores) / len(_valid_scores)) if _valid_scores else 0
 
-missed_tasks_habit = build_missed_habit_tasks(plan_w, done_w)
+missed_tasks_habit = build_missed_habit_tasks_for_page(props_yesterday)
 
 # ── 判定（睡眠時間 × 体調）────────────────────────
 def calc_judge(sleep_val, cond):
@@ -1718,8 +1719,6 @@ if cond_counts:
 else:
     w_cond_summary = "-"
 
-habit_done_count = {}
-_subcat_to_habit_key = {c["subcategory"]: c["key"] for c in HABIT_CATEGORIES}
 import re as _re
 TASK_ALIASES = {
     "ライアン": "動画視聴",
@@ -1731,13 +1730,13 @@ def normalize_task(name):
     base = _re.sub(r"（[^）]*）", "", name).strip()
     return TASK_ALIASES.get(base, base)
 
+habit_done_count = {}
 for _, p in weekly_pages:
-    tasks = [t["name"].lstrip("🔥") for t in p.get("【W】実績", {}).get("multi_select", [])]
-    for task in tasks:
-        normalized = normalize_task(task)
-        habit_key = _subcat_to_habit_key.get(classify_routine_subcategory(normalized))
-        if habit_key:
-            k = (normalized, habit_key)
+    _, _, dones = get_habit_data_for_date(p)
+    for cat in HABIT_CATEGORIES:
+        for task in dones[cat["key"]]:
+            normalized = normalize_task(task.lstrip("🔥"))
+            k = (normalized, cat["key"])
             habit_done_count[k] = habit_done_count.get(k, 0) + 1
 
 weekly_habit_task_rows = {}
@@ -1778,12 +1777,11 @@ else:
 
 m_habit_done_count = {}
 for _, p in monthly_pages:
-    tasks = [t["name"].lstrip("🔥") for t in p.get("【W】実績", {}).get("multi_select", [])]
-    for task in tasks:
-        normalized = normalize_task(task)
-        habit_key = _subcat_to_habit_key.get(classify_routine_subcategory(normalized))
-        if habit_key:
-            k = (normalized, habit_key)
+    _, _, dones = get_habit_data_for_date(p)
+    for cat in HABIT_CATEGORIES:
+        for task in dones[cat["key"]]:
+            normalized = normalize_task(task.lstrip("🔥"))
+            k = (normalized, cat["key"])
             m_habit_done_count[k] = m_habit_done_count.get(k, 0) + 1
 
 monthly_habit_task_rows = {}
@@ -1897,9 +1895,7 @@ def generate_weekly_comment(
 
     missed_tasks_w = []
     for _, p in weekly_pages:
-        plan_w = [t["name"] for t in p.get("【W】予定タスク", {}).get("multi_select", [])]
-        done_w = [t["name"] for t in p.get("【W】実績", {}).get("multi_select", [])]
-        for task, label in build_missed_habit_tasks(plan_w, done_w):
+        for task, label in build_missed_habit_tasks_for_page(p):
             missed_tasks_w.append(f"{label}: {task}")
     missed_str = "\n".join(list(dict.fromkeys(missed_tasks_w))[:8]) or "なし"
 
@@ -1963,9 +1959,7 @@ def generate_monthly_comment(
 
     missed_tasks_m = []
     for _, p in monthly_pages:
-        plan_w = [t["name"] for t in p.get("【W】予定タスク", {}).get("multi_select", [])]
-        done_w = [t["name"] for t in p.get("【W】実績", {}).get("multi_select", [])]
-        for task, label in build_missed_habit_tasks(plan_w, done_w):
+        for task, label in build_missed_habit_tasks_for_page(p):
             missed_tasks_m.append(f"{label}: {task}")
     missed_str = "\n".join(list(dict.fromkeys(missed_tasks_m))[:10]) or "なし"
 
