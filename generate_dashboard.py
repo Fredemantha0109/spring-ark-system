@@ -20,7 +20,10 @@ from ark_config import (
     JST,
     LABEL_BY_KEY,
     PROJECT_START,
+    ROUTINE_SUBCATEGORY_EMOJI,
+    ROUTINE_SUBCATEGORY_ORDER,
     SUBTITLE_BY_KEY,
+    classify_routine_subcategory,
     now_jst,
     today_jst,
     yesterday_jst,
@@ -990,34 +993,94 @@ def _normalize_task_display(name: str) -> str:
         name = name.replace(d, "")
     return name
 
+def _daily_task_row_html(task, done_tasks):
+    done = task in done_tasks
+    if done:
+        icon = (
+            '<div class="w-3.5 h-3.5 rounded-full flex-shrink-0 bg-green-500/25 border border-green-400/60'
+            ' flex items-center justify-center">'
+            '<svg class="w-2 h-2 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">'
+            '<polyline stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="20 6 9 17 4 12"/>'
+            '</svg></div>'
+        )
+    else:
+        icon = '<div class="w-3.5 h-3.5 rounded-full flex-shrink-0 border border-white/15 bg-white/5"></div>'
+    display_name = _normalize_task_display(task.lstrip("🔥").strip())
+    name_class = "text-white/40 line-through" if done else "text-white/80"
+    row_class  = "priority-row" if "🔥" in task else ""
+    return (
+        '<div class="flex items-center gap-1.5 py-[3px] ' + row_class + '">'
+        + icon
+        + '<span class="text-xs flex-1 leading-tight ' + name_class + '">' + display_name + '</span>'
+        + '</div>'
+    )
+
 def task_rows_html(plan_tasks, done_tasks):
     if not plan_tasks:
         return '<p class="text-xs italic py-1" style="color:rgba(74,90,114,0.7)">前日タスクなし</p>'
-    items = []
-    for task in plan_tasks:
-        done = task in done_tasks
-        if done:
-            icon = (
-                '<div class="w-3.5 h-3.5 rounded-full flex-shrink-0 bg-green-500/25 border border-green-400/60'
-                ' flex items-center justify-center">'
-                '<svg class="w-2 h-2 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">'
-                '<polyline stroke-width="3" stroke-linecap="round" stroke-linejoin="round" points="20 6 9 17 4 12"/>'
-                '</svg></div>'
-            )
-        else:
-            icon = '<div class="w-3.5 h-3.5 rounded-full flex-shrink-0 border border-white/15 bg-white/5"></div>'
-        display_name = _normalize_task_display(task.lstrip("🔥").strip())
-        name_class = "text-white/40 line-through" if done else "text-white/80"
-        row_class  = "priority-row" if "🔥" in task else ""
-        items.append(
-            '<div class="flex items-center gap-1.5 py-[3px] ' + row_class + '">'
-            + icon
-            + '<span class="text-xs flex-1 leading-tight ' + name_class + '">' + display_name + '</span>'
-            + '</div>'
-        )
+    items = [_daily_task_row_html(task, done_tasks) for task in plan_tasks]
     return '<div class="grid grid-cols-2 gap-x-3 gap-y-0.5">' + "\n".join(items) + '</div>'
 
-def category_card(name, subtitle, icon_svg, color, score, plan_tasks, done_tasks):
+def routine_task_rows_html(plan_tasks, done_tasks):
+    """Routine(W)カード用: サブカテゴリ別にグルーピング表示。"""
+    if not plan_tasks:
+        return '<p class="text-xs italic py-1" style="color:rgba(74,90,114,0.7)">前日タスクなし</p>'
+    grouped = {sub: [] for sub in ROUTINE_SUBCATEGORY_ORDER}
+    for task in plan_tasks:
+        grouped[classify_routine_subcategory(task)].append(task)
+    sections = []
+    for sub in ROUTINE_SUBCATEGORY_ORDER:
+        tasks = grouped[sub]
+        if not tasks:
+            continue
+        emoji = ROUTINE_SUBCATEGORY_EMOJI.get(sub, "")
+        rows = "\n".join(_daily_task_row_html(task, done_tasks) for task in tasks)
+        sections.append(
+            '<div class="mb-2.5 last:mb-0">'
+            + f'<p class="text-[10px] font-bold text-white/45 tracking-wide mb-1 pl-0.5">{emoji}\u00a0{sub}</p>'
+            + '<div class="grid grid-cols-2 gap-x-3 gap-y-0.5">'
+            + rows
+            + '</div></div>'
+        )
+    return "".join(sections)
+
+def _weekly_count_row_html(task_name, cnt):
+    return (
+        f'<div class="flex items-center gap-1.5 py-[3px]">'
+        f'<div class="w-3.5 h-3.5 rounded-full flex-shrink-0 bg-green-500/25 border border-green-400/60 flex items-center justify-center">'
+        f'<span class="text-[7px] font-black text-green-400">{cnt}</span></div>'
+        f'<span class="text-xs flex-1 leading-tight text-white/80">{task_name}</span>'
+        f'</div>'
+    )
+
+def routine_weekly_task_rows_html(task_rows_list, done_count):
+    """Routine(W)カード用: 週次/月次の実績をサブカテゴリ別にグルーピング表示。"""
+    grouped = {sub: [] for sub in ROUTINE_SUBCATEGORY_ORDER}
+    for task_name, cat_key in task_rows_list:
+        cnt = done_count.get((task_name, cat_key), 0)
+        if cnt == 0:
+            continue
+        grouped[classify_routine_subcategory(task_name)].append((task_name, cnt))
+    sections = []
+    for sub in ROUTINE_SUBCATEGORY_ORDER:
+        items = grouped[sub]
+        if not items:
+            continue
+        items.sort(key=lambda x: -x[1])
+        emoji = ROUTINE_SUBCATEGORY_EMOJI.get(sub, "")
+        rows = "".join(_weekly_count_row_html(t, c) for t, c in items)
+        sections.append(
+            '<div class="mb-2.5 last:mb-0">'
+            + f'<p class="text-[10px] font-bold text-white/45 tracking-wide mb-1 pl-0.5">{emoji}\u00a0{sub}</p>'
+            + '<div class="grid grid-cols-2 gap-x-3 gap-y-0.5">'
+            + rows
+            + '</div></div>'
+        )
+    if not sections:
+        return '<p class="text-xs italic py-1" style="color:rgba(74,90,114,0.7)">今週の実績なし</p>'
+    return "".join(sections)
+
+def category_card(name, subtitle, icon_svg, color, score, plan_tasks, done_tasks, group_routine=False):
     color_map = {
         "green": ("text-green-400", "bg-green-500/10 border-green-500/20", "border-ark-border",   "from-green-600 to-emerald-400"),
         "amber": ("text-amber-400", "bg-amber-500/10 border-amber-500/20", "border-amber-500/20", "from-amber-500 to-yellow-400"),
@@ -1025,7 +1088,7 @@ def category_card(name, subtitle, icon_svg, color, score, plan_tasks, done_tasks
         "sky":   ("text-sky-400",   "bg-sky-500/10 border-sky-500/20",     "border-sky-500/20",   "from-sky-500 to-cyan-400"),
     }
     text_c, icon_wrap, card_border, bar_grad = color_map[color]
-    rows = task_rows_html(plan_tasks, done_tasks)
+    rows = routine_task_rows_html(plan_tasks, done_tasks) if group_routine else task_rows_html(plan_tasks, done_tasks)
     score_disp = "-" if score is None else str(score)
     bar_width  = "0" if score is None else str(score)
     score_suffix = "" if score is None else '<span class="text-sm text-ark-muted font-normal">/100点</span>'
@@ -1430,7 +1493,12 @@ generated_at = now_jst().strftime("%H:%M")
 
 target_date   = datetime.strptime(yesterday, "%Y-%m-%d").replace(tzinfo=JST)
 delta_days    = (target_date - PROJECT_START).days
-week_num      = max(1, delta_days // 7 + 1)
+# PROJECT_START より前はシーズン未開始のため Pre-Season と表示する
+if delta_days < 0:
+    week_label = "Pre-Season"
+else:
+    week_num   = delta_days // 7 + 1
+    week_label = f"Week\u00a0{week_num}"
 
 month = target_date.month
 if month <= 3:
@@ -1444,7 +1512,7 @@ else:
 q_start = datetime(target_date.year, q_start_month, 1, tzinfo=JST)
 q_day   = (target_date - q_start).days + 1
 
-header_date = f"{yesterday}\u00a0·\u00a0Week\u00a0{week_num}\u00a0·\u00a0Q{quarter}-Day\u00a0{q_day}"
+header_date = f"{yesterday}\u00a0·\u00a0{week_label}\u00a0·\u00a0Q{quarter}-Day\u00a0{q_day}"
 
 
 # ── Weekly集計（先週月〜日）────────────────────────
@@ -2146,7 +2214,8 @@ else:
     )
 
 
-def weekly_task_card(name, subtitle, icon_svg, color, score, task_rows_list):
+def weekly_task_card(name, subtitle, icon_svg, color, score, task_rows_list, group_routine=False, done_count=None):
+    counts = done_count if done_count is not None else task_done_count
     color_map = {
         "green": ("text-green-400", "bg-green-500/10 border-green-500/20", "border-ark-border",   "from-green-600 to-emerald-400"),
         "amber": ("text-amber-400", "bg-amber-500/10 border-amber-500/20", "border-amber-500/20", "from-amber-500 to-yellow-400"),
@@ -2154,22 +2223,19 @@ def weekly_task_card(name, subtitle, icon_svg, color, score, task_rows_list):
         "sky":   ("text-sky-400",   "bg-sky-500/10 border-sky-500/20",     "border-sky-500/20",   "from-sky-500 to-cyan-400"),
     }
     text_c, icon_wrap, card_border, bar_grad = color_map[color]
-    items_html = ""
-    for task_name, cat_key in task_rows_list:
-        cnt = task_done_count.get((task_name, cat_key), 0)
-        if cnt == 0:
-            continue
-        items_html += (
-            f'<div class="flex items-center gap-1.5 py-[3px]">'
-            f'<div class="w-3.5 h-3.5 rounded-full flex-shrink-0 bg-green-500/25 border border-green-400/60 flex items-center justify-center">'
-            f'<span class="text-[7px] font-black text-green-400">{cnt}</span></div>'
-            f'<span class="text-xs flex-1 leading-tight text-white/80">{task_name}</span>'
-            f'</div>'
-        )
-    if not items_html:
-        rows_html = '<p class="text-xs italic py-1" style="color:rgba(74,90,114,0.7)">今週の実績なし</p>'
+    if group_routine:
+        rows_html = routine_weekly_task_rows_html(task_rows_list, counts)
     else:
-        rows_html = '<div class="grid grid-cols-2 gap-x-3 gap-y-0.5">' + items_html + '</div>'
+        items_html = ""
+        for task_name, cat_key in task_rows_list:
+            cnt = counts.get((task_name, cat_key), 0)
+            if cnt == 0:
+                continue
+            items_html += _weekly_count_row_html(task_name, cnt)
+        if not items_html:
+            rows_html = '<p class="text-xs italic py-1" style="color:rgba(74,90,114,0.7)">今週の実績なし</p>'
+        else:
+            rows_html = '<div class="grid grid-cols-2 gap-x-3 gap-y-0.5">' + items_html + '</div>'
     return (
         '<div class="ark-card bg-ark-card border ' + card_border + ' rounded-2xl p-4 min-h-[120px]">'
         '<div class="flex items-start justify-between mb-3">'
@@ -2191,21 +2257,21 @@ def weekly_task_card(name, subtitle, icon_svg, color, score, task_rows_list):
     )
 
 weekly_cards_html = (
-    weekly_task_card(BADGE_BY_KEY["W"],  SUBTITLE_BY_KEY["W"],  ICON_W,  CATEGORY_BY_KEY["W"]["color"],  w_score_w,  weekly_task_rows["W"],  ) +
+    weekly_task_card(BADGE_BY_KEY["W"],  SUBTITLE_BY_KEY["W"],  ICON_W,  CATEGORY_BY_KEY["W"]["color"],  w_score_w,  weekly_task_rows["W"],  group_routine=True) +
     weekly_task_card(BADGE_BY_KEY["C"],  SUBTITLE_BY_KEY["C"],  ICON_C,  CATEGORY_BY_KEY["C"]["color"],  w_score_c,  weekly_task_rows["C"],  ) +
     weekly_task_card(BADGE_BY_KEY["Ca"], SUBTITLE_BY_KEY["Ca"], ICON_CA, CATEGORY_BY_KEY["Ca"]["color"], w_score_ca, weekly_task_rows["Ca"], ) +
     weekly_task_card(BADGE_BY_KEY["I"],  SUBTITLE_BY_KEY["I"],  ICON_I,  CATEGORY_BY_KEY["I"]["color"],  w_score_i,  weekly_task_rows["I"],  )
 )
 
 monthly_cards_html = (
-    weekly_task_card(BADGE_BY_KEY["W"],  SUBTITLE_BY_KEY["W"],  ICON_W,  CATEGORY_BY_KEY["W"]["color"],  m_score_w,  monthly_task_rows["W"],  ) +
-    weekly_task_card(BADGE_BY_KEY["C"],  SUBTITLE_BY_KEY["C"],  ICON_C,  CATEGORY_BY_KEY["C"]["color"],  m_score_c,  monthly_task_rows["C"],  ) +
-    weekly_task_card(BADGE_BY_KEY["Ca"], SUBTITLE_BY_KEY["Ca"], ICON_CA, CATEGORY_BY_KEY["Ca"]["color"], m_score_ca, monthly_task_rows["Ca"], ) +
-    weekly_task_card(BADGE_BY_KEY["I"],  SUBTITLE_BY_KEY["I"],  ICON_I,  CATEGORY_BY_KEY["I"]["color"],  m_score_i,  monthly_task_rows["I"],  )
+    weekly_task_card(BADGE_BY_KEY["W"],  SUBTITLE_BY_KEY["W"],  ICON_W,  CATEGORY_BY_KEY["W"]["color"],  m_score_w,  monthly_task_rows["W"],  group_routine=True, done_count=m_task_done_count) +
+    weekly_task_card(BADGE_BY_KEY["C"],  SUBTITLE_BY_KEY["C"],  ICON_C,  CATEGORY_BY_KEY["C"]["color"],  m_score_c,  monthly_task_rows["C"],  done_count=m_task_done_count) +
+    weekly_task_card(BADGE_BY_KEY["Ca"], SUBTITLE_BY_KEY["Ca"], ICON_CA, CATEGORY_BY_KEY["Ca"]["color"], m_score_ca, monthly_task_rows["Ca"], done_count=m_task_done_count) +
+    weekly_task_card(BADGE_BY_KEY["I"],  SUBTITLE_BY_KEY["I"],  ICON_I,  CATEGORY_BY_KEY["I"]["color"],  m_score_i,  monthly_task_rows["I"],  done_count=m_task_done_count)
 )
 
 cards_html = (
-    category_card(BADGE_BY_KEY["W"],  SUBTITLE_BY_KEY["W"],  ICON_W,  CATEGORY_BY_KEY["W"]["color"],  score_w,  plan_w,  done_w)  +
+    category_card(BADGE_BY_KEY["W"],  SUBTITLE_BY_KEY["W"],  ICON_W,  CATEGORY_BY_KEY["W"]["color"],  score_w,  plan_w,  done_w,  group_routine=True) +
     category_card(BADGE_BY_KEY["C"],  SUBTITLE_BY_KEY["C"],  ICON_C,  CATEGORY_BY_KEY["C"]["color"],  score_c,  plan_c,  done_c)  +
     category_card(BADGE_BY_KEY["Ca"], SUBTITLE_BY_KEY["Ca"], ICON_CA, CATEGORY_BY_KEY["Ca"]["color"], score_ca, plan_ca, done_ca) +
     category_card(BADGE_BY_KEY["I"],  SUBTITLE_BY_KEY["I"],  ICON_I,  CATEGORY_BY_KEY["I"]["color"],  score_i,  plan_i,  done_i)

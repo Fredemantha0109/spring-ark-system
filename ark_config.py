@@ -105,6 +105,41 @@ CATEGORY_PROMPT_LEGEND = "、".join(
     f'{c["key"]}={c["label"]}' for c in CATEGORIES
 )
 
+# ── Routine サブカテゴリ（表示用。Notionデータ構造は変更しない）────────────
+ROUTINE_SUBCATEGORIES = {
+    "トレーニング": ["ジム", "ウォーキング"],
+    "英語学習": [
+        "SB", "OP", "語彙", "リスニング", "瞬間英作文", "英会話",
+        "英会話振り返り", "Reuse", "Soccer", "Youtube", "定着学習",
+        "Scrambled", "シャドーイング", "ライアン", "動画視聴",
+    ],
+    "インプット": ["NewsPicks"],
+    "内省": ["瞑想", "ジャーナリング", "Shakti"],
+}
+
+ROUTINE_SUBCATEGORY_ORDER = ["トレーニング", "英語学習", "インプット", "内省", "未分類"]
+
+ROUTINE_SUBCATEGORY_EMOJI = {
+    "トレーニング": "🏋️",
+    "英語学習": "📖",
+    "インプット": "📰",
+    "内省": "🧘",
+    "未分類": "❓",
+}
+
+
+def classify_routine_subcategory(task_name: str) -> str:
+    """タスク名を Routine サブカテゴリに分類する（部分一致）。"""
+    base = task_name.lstrip("🔥").strip()
+    for subcat in ROUTINE_SUBCATEGORY_ORDER:
+        if subcat == "未分類":
+            continue
+        for keyword in ROUTINE_SUBCATEGORIES[subcat]:
+            if keyword in base:
+                return subcat
+    return "未分類"
+
+
 # 表示用: "🔁 Routine"
 def category_display(key: str) -> str:
     c = CATEGORY_BY_KEY[key]
