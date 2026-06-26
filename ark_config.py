@@ -142,6 +142,90 @@ def classify_routine_subcategory(task_name: str) -> str:
     return "未分類"
 
 
+# ── Daily タブ用 習慣4分類（表示・オンザフライスコア。Notionスキーマは不変）──
+HABIT_CATEGORIES = [
+    {
+        "key": "mind",
+        "label": "MIND",
+        "subtitle": "瞑想・ジャーナリング・Shakti",
+        "subcategory": "内省",
+        "emoji": "🧘",
+        "color": "purple",
+    },
+    {
+        "key": "physical",
+        "label": "PHYSICAL",
+        "subtitle": "ジム・ウォーキング",
+        "subcategory": "トレーニング",
+        "emoji": "🏋️",
+        "color": "green",
+    },
+    {
+        "key": "english",
+        "label": "ENGLISH",
+        "subtitle": "TOEIC・英会話",
+        "subcategory": "英語学習",
+        "emoji": "🇬🇧",
+        "color": "blue",
+    },
+    {
+        "key": "knowledge",
+        "label": "KNOWLEDGE",
+        "subtitle": "NewsPicks等",
+        "subcategory": "インプット",
+        "emoji": "📰",
+        "color": "amber",
+    },
+]
+
+HABIT_BY_KEY = {c["key"]: c for c in HABIT_CATEGORIES}
+
+# AIプロンプト用: "MIND=瞑想・内省、PHYSICAL=運動、ENGLISH=英語学習、KNOWLEDGE=情報収集"
+_HABIT_PROMPT_DESCRIPTIONS = {
+    "mind": "瞑想・内省",
+    "physical": "運動",
+    "english": "英語学習",
+    "knowledge": "情報収集",
+}
+HABIT_PROMPT_LEGEND = "、".join(
+    f'{c["label"]}={_HABIT_PROMPT_DESCRIPTIONS[c["key"]]}' for c in HABIT_CATEGORIES
+)
+
+
+def filter_tasks_by_subcategory(tasks, subcategory):
+    return [t for t in tasks if classify_routine_subcategory(t) == subcategory]
+
+
+def compute_habit_scores(plan_tasks, done_tasks):
+    """【W】タスクを習慣4分類に振り分け、オンザフライでスコア算出。"""
+    from calc_score import calculate_category_score
+
+    scores, plans, dones = {}, {}, {}
+    for cat in HABIT_CATEGORIES:
+        plan = filter_tasks_by_subcategory(plan_tasks, cat["subcategory"])
+        done = filter_tasks_by_subcategory(done_tasks, cat["subcategory"])
+        plans[cat["key"]] = plan
+        dones[cat["key"]] = done
+        scores[cat["key"]] = calculate_category_score(plan, done)
+    valid = [s for s in scores.values() if s is not None]
+    total = round(sum(valid) / len(valid)) if valid else 0
+    return scores, plans, dones, total
+
+
+def build_missed_habit_tasks(plan_tasks, done_tasks):
+    """【W】タスクの未達を習慣4分類ラベル付きで返す。"""
+    done_clean = {d.lstrip("🔥") for d in done_tasks}
+    subcat_to_label = {c["subcategory"]: c["label"] for c in HABIT_CATEGORIES}
+    missed = []
+    for task in plan_tasks:
+        clean = task.lstrip("🔥")
+        if clean not in done_clean:
+            subcat = classify_routine_subcategory(clean)
+            label = subcat_to_label.get(subcat, "未分類")
+            missed.append((clean, label))
+    return missed
+
+
 # 表示用: "🔁 Routine"
 def category_display(key: str) -> str:
     c = CATEGORY_BY_KEY[key]

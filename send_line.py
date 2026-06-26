@@ -2,7 +2,7 @@ import os
 import requests
 import json
 
-from ark_config import now_jst, today_jst, yesterday_jst
+from ark_config import HABIT_CATEGORIES, compute_habit_scores, now_jst, today_jst, yesterday_jst
 
 def send_line_message(message: str) -> bool:
     token = os.environ.get("LINE_ACCESS_TOKEN")
@@ -116,22 +116,12 @@ if __name__ == "__main__":
     if not props_today:
         props_today = props_yesterday
 
-    # 予定タスク件数（昨日ページ）
-    def plan_count(key):
-        return len(props_yesterday.get(key, {}).get("multi_select", []))
+    def get_tasks(key):
+        return [t["name"] for t in props_yesterday.get(key, {}).get("multi_select", [])]
 
-    # スコアは昨日のページから（予定タスク0件のカテゴリは None = 総合スコアから除外）
-    def get_score_or_none(score_key, plan_key):
-        if plan_count(plan_key) == 0:
-            return None
-        return props_yesterday.get(score_key, {}).get("formula", {}).get("number", 0) or 0
-
-    score_w  = get_score_or_none("【W】スコア",  "【W】予定タスク")
-    score_c  = get_score_or_none("【C】スコア",  "【C】予定タスク")
-    score_ca = get_score_or_none("【Ca】スコア", "【Ca】予定タスク")
-    score_i  = get_score_or_none("【I】スコア",  "【I】予定タスク")
-    _valid = [s for s in [score_w, score_c, score_ca, score_i] if s is not None]
-    score_total = round(sum(_valid) / len(_valid)) if _valid else 0
+    plan_w = get_tasks("【W】予定タスク")
+    done_w = get_tasks("【W】実績")
+    habit_scores, _, _, score_total = compute_habit_scores(plan_w, done_w)
 
     def fmt(s): return str(int(s)) if s is not None else "-"
 
@@ -154,12 +144,16 @@ if __name__ == "__main__":
     sleep_str  = f"{sleep_val}h" if sleep_val is not None else "-"
     weight_str = f"{weight}kg"   if weight    is not None else "-"
 
+    habit_score_line = " / ".join(
+        f"{c['label']}: {fmt(habit_scores.get(c['key']))}"
+        for c in HABIT_CATEGORIES
+    )
     message = (
-        f"🌱 Spring Ark Daily Report\n"
+        f"☀️ Summer Ark Daily Report\n"
         f"{today} {judge}\n"
         f"\n"
         f"📊 総合スコア: {score_total}点\n"
-        f"  W: {fmt(score_w)} / C: {fmt(score_c)} / Ca: {fmt(score_ca)} / I: {fmt(score_i)}\n"
+        f"  {habit_score_line}\n"
         f"\n"
         f"💪 体重: {weight_str}\n"
         f"😴 睡眠: {sleep_str}\n"

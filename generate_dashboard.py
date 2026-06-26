@@ -16,7 +16,10 @@ from ark_config import (
     ARK_NAME,
     BADGE_BY_KEY,
     CATEGORY_BY_KEY,
-    CATEGORY_PROMPT_LEGEND,
+    HABIT_CATEGORIES,
+    HABIT_PROMPT_LEGEND,
+    build_missed_habit_tasks,
+    compute_habit_scores,
     JST,
     LABEL_BY_KEY,
     PROJECT_START,
@@ -980,7 +983,10 @@ def generate_strategy(sleep_val, cond, judge, scores, missed_tasks, weight_val="
         cal_str = "\n".join([f"・{ev['start']} {ev['name']}" for ev in cal_events])
     else:
         cal_str = "なし"
-    score_str  = f"W:{scores[0]} / C:{scores[1]} / Ca:{scores[2]} / I:{scores[3]}"
+    score_str = " / ".join(
+        f"{c['label']}:{scores.get(c['key']) if scores.get(c['key']) is not None else '-'}"
+        for c in HABIT_CATEGORIES
+    )
     prompt = (
         f"あなたは{ARK_NAME}プロジェクトのパーソナルコーチです。\n"
         "以下のデータをもとに、今日の具体的な推奨作戦を3つ、JSON形式で出力してください。\n\n"
@@ -1025,7 +1031,9 @@ done_c  = get_tasks("【C】実績")
 done_ca = get_tasks("【Ca】実績")
 done_i  = get_tasks("【I】実績")
 
-# 予定タスク0件のカテゴリはスコアを除外し、総合スコアを再計算
+habit_scores, habit_plans, habit_dones, habit_score_total = compute_habit_scores(plan_w, done_w)
+
+# 予定タスク0件のカテゴリはスコアを除外し、総合スコアを再計算（W/C/Ca/I — Weekly/Monthly等で引き続き使用）
 if len(plan_w)  == 0: score_w  = None
 if len(plan_c)  == 0: score_c  = None
 if len(plan_ca) == 0: score_ca = None
@@ -1033,23 +1041,7 @@ if len(plan_i)  == 0: score_i  = None
 _valid_scores = [s for s in [score_w, score_c, score_ca, score_i] if s is not None]
 score_total = round(sum(_valid_scores) / len(_valid_scores)) if _valid_scores else 0
 
-missed_tasks_all = []
-for task in plan_w:
-    clean = task.lstrip("🔥")
-    if clean not in [d.lstrip("🔥") for d in done_w]:
-        missed_tasks_all.append((clean, LABEL_BY_KEY["W"]))
-for task in plan_c:
-    clean = task.lstrip("🔥")
-    if clean not in [d.lstrip("🔥") for d in done_c]:
-        missed_tasks_all.append((clean, LABEL_BY_KEY["C"]))
-for task in plan_ca:
-    clean = task.lstrip("🔥")
-    if clean not in [d.lstrip("🔥") for d in done_ca]:
-        missed_tasks_all.append((clean, LABEL_BY_KEY["Ca"]))
-for task in plan_i:
-    clean = task.lstrip("🔥")
-    if clean not in [d.lstrip("🔥") for d in done_i]:
-        missed_tasks_all.append((clean, LABEL_BY_KEY["I"]))
+missed_tasks_habit = build_missed_habit_tasks(plan_w, done_w)
 
 # ── 判定（睡眠時間 × 体調）────────────────────────
 def calc_judge(sleep_val, cond):
@@ -1247,24 +1239,27 @@ def routine_weekly_task_rows_html(task_rows_list, done_count):
         return '<p class="text-xs italic py-1" style="color:rgba(74,90,114,0.7)">今週の実績なし</p>'
     return "".join(sections)
 
-def category_card(name, subtitle, icon_svg, color, score, plan_tasks, done_tasks, group_routine=False):
+def category_card(name, subtitle, icon_svg, color, score, plan_tasks, done_tasks, group_routine=False, emoji=None):
     color_map = {
-        "green": ("text-green-400", "bg-green-500/10 border-green-500/20", "border-ark-border",   "from-green-600 to-emerald-400"),
-        "amber": ("text-amber-400", "bg-amber-500/10 border-amber-500/20", "border-amber-500/20", "from-amber-500 to-yellow-400"),
-        "rose":  ("text-rose-400",  "bg-rose-500/10 border-rose-500/20",   "border-rose-500/25",  "from-rose-600 to-red-400"),
-        "sky":   ("text-sky-400",   "bg-sky-500/10 border-sky-500/20",     "border-sky-500/20",   "from-sky-500 to-cyan-400"),
+        "green":  ("text-green-400",  "bg-green-500/10 border-green-500/20",   "border-ark-border",   "from-green-600 to-emerald-400"),
+        "amber":  ("text-amber-400",  "bg-amber-500/10 border-amber-500/20",   "border-amber-500/20", "from-amber-500 to-yellow-400"),
+        "rose":   ("text-rose-400",   "bg-rose-500/10 border-rose-500/20",     "border-rose-500/25",  "from-rose-600 to-red-400"),
+        "sky":    ("text-sky-400",    "bg-sky-500/10 border-sky-500/20",       "border-sky-500/20",   "from-sky-500 to-cyan-400"),
+        "purple": ("text-violet-400", "bg-violet-500/10 border-violet-500/20", "border-violet-500/20", "from-violet-600 to-purple-400"),
+        "blue":   ("text-blue-400",   "bg-blue-500/10 border-blue-500/20",     "border-blue-500/20",  "from-blue-600 to-sky-400"),
     }
     text_c, icon_wrap, card_border, bar_grad = color_map[color]
     rows = routine_task_rows_html(plan_tasks, done_tasks) if group_routine else task_rows_html(plan_tasks, done_tasks)
     score_disp = "-" if score is None else str(score)
     bar_width  = "0" if score is None else str(score)
     score_suffix = "" if score is None else '<span class="text-sm text-ark-muted font-normal">/100点</span>'
+    icon_inner = f'<span class="text-base leading-none">{emoji}</span>' if emoji else f'<span class="{text_c}">{icon_svg}</span>'
     return (
         '<div class="ark-card bg-ark-card border ' + card_border + ' rounded-2xl p-4 min-h-[120px]">'
         '<div class="flex items-start justify-between mb-3">'
         '<div class="flex items-center gap-2.5">'
         '<div class="w-8 h-8 rounded-xl ' + icon_wrap + ' border flex items-center justify-center flex-shrink-0">'
-        '<span class="' + text_c + '">' + icon_svg + '</span>'
+        + icon_inner +
         '</div>'
         '<div>'
         '<p class="text-xs font-black ' + text_c + ' tracking-[.15em]">' + name + '</p>'
@@ -1291,14 +1286,14 @@ def generate_agent_comment(sleep_val, cond, judge, scores, missed_tasks, weight_
         return ""
     cal_str = "\n".join([f"・{ev['start']} {ev['name']}" for ev in cal_events]) if cal_events else "なし"
     score_str = " / ".join(
-        f"{k}:{(v if v is not None else '-')}"
-        for k, v in zip(["W", "C", "Ca", "I"], scores)
+        f"{c['label']}:{scores.get(c['key']) if scores.get(c['key']) is not None else '-'}"
+        for c in HABIT_CATEGORIES
     )
     prompt = (
         f"あなたは{ARK_NAME}のパーソナルコーチです。\n"
         "以下のデータをもとに、今日のコンディションと状況を踏まえた分析コメントを2〜3文で出力してください。\n"
         "JSONではなく自然な日本語テキストのみ出力してください。\n"
-        f"カテゴリ名は必ず{CATEGORY_PROMPT_LEGEND}と表記してください。\n\n"
+        f"カテゴリ名は必ず{HABIT_PROMPT_LEGEND}と表記してください。\n\n"
         f"- 睡眠: {sleep_val}h / 体調: {cond} / 体重: {weight_val}kg / 判定: {judge}\n"
         f"- スコア: {score_str}\n"
         f"- 今日のカレンダー: {cal_str}\n"
@@ -1373,8 +1368,8 @@ elif CALENDAR_DATABASE_ID:
 
 agent_comment = generate_agent_comment(
     sleep, condition, judge_label,
-    [score_w, score_c, score_ca, score_i],
-    missed_tasks_all[:8],
+    habit_scores,
+    missed_tasks_habit[:8],
     weight,
     calendar_events
 )
@@ -1513,8 +1508,8 @@ load_badge_html = (
 
 ai_strategies = generate_strategy(
     sleep, condition, judge_label,
-    [score_w, score_c, score_ca, score_i],
-    missed_tasks_all[:8],
+    habit_scores,
+    missed_tasks_habit[:8],
     weight_val=weight,
     calendar_events=calendar_events
 )
@@ -1832,7 +1827,7 @@ m_badge_html = majority_load([d for d, _ in monthly_pages], "月")
 weight_diff_html = diff_label(weight, w_weight_avg, "kg")
 sleep_diff_html  = diff_label(sleep,  w_sleep_avg,  "h")
 
-score_diff = round(score_total - w_score_total) if w_score_total else 0
+score_diff = round(habit_score_total - w_score_total) if w_score_total else 0
 if score_diff > 0:
     score_diff_html = f'<span class="text-[9px] text-green-400 font-bold block mt-0.5">+{score_diff}点</span>'
 elif score_diff < 0:
@@ -1904,7 +1899,8 @@ else:
 # ── ▲ 英語学習AI分析実行ここまで ─────────────────
 
 
-# ── ▼ generate_weekly_comment（ジャーナリング統合版）──
+# ── ▼ generate_weekly_comment（ジャーナリング統合版）
+# Stage3: Weekly/Monthly は W/C/Ca/I のまま。新4分類対応は次ステージ。
 def generate_weekly_comment(
     w_score_w, w_score_c, w_score_ca, w_score_i, w_score_total,
     w_weight_avg, w_sleep_avg, w_cond_summary, task_done_count,
@@ -1967,7 +1963,8 @@ def generate_weekly_comment(
 # ── ▲ generate_weekly_comment ここまで ──────────────
 
 
-# ── ▼ generate_monthly_comment（ジャーナリング統合版）─
+# ── ▼ generate_monthly_comment（ジャーナリング統合版）
+# Stage3: Weekly/Monthly は W/C/Ca/I のまま。新4分類対応は次ステージ。
 def generate_monthly_comment(
     m_score_w, m_score_c, m_score_ca, m_score_i, m_score_total,
     m_weight_avg, m_sleep_avg, m_cond_summary, m_task_done_count,
@@ -2439,11 +2436,18 @@ monthly_cards_html = (
     weekly_task_card(BADGE_BY_KEY["I"],  SUBTITLE_BY_KEY["I"],  ICON_I,  CATEGORY_BY_KEY["I"]["color"],  m_score_i,  monthly_task_rows["I"],  done_count=m_task_done_count)
 )
 
-cards_html = (
-    category_card(BADGE_BY_KEY["W"],  SUBTITLE_BY_KEY["W"],  ICON_W,  CATEGORY_BY_KEY["W"]["color"],  score_w,  plan_w,  done_w,  group_routine=True) +
-    category_card(BADGE_BY_KEY["C"],  SUBTITLE_BY_KEY["C"],  ICON_C,  CATEGORY_BY_KEY["C"]["color"],  score_c,  plan_c,  done_c)  +
-    category_card(BADGE_BY_KEY["Ca"], SUBTITLE_BY_KEY["Ca"], ICON_CA, CATEGORY_BY_KEY["Ca"]["color"], score_ca, plan_ca, done_ca) +
-    category_card(BADGE_BY_KEY["I"],  SUBTITLE_BY_KEY["I"],  ICON_I,  CATEGORY_BY_KEY["I"]["color"],  score_i,  plan_i,  done_i)
+cards_html = "".join(
+    category_card(
+        cat["label"],
+        cat["subtitle"],
+        "",
+        cat["color"],
+        habit_scores[cat["key"]],
+        habit_plans[cat["key"]],
+        habit_dones[cat["key"]],
+        emoji=cat["emoji"],
+    )
+    for cat in HABIT_CATEGORIES
 )
 
 # ── HTML組み立て ──────────────────────────────────
@@ -2582,7 +2586,7 @@ f"<p class=\"ark-stat-num text-xl font-black {cond_text_c}\">{condition}</p></di
 
 f"          <div class=\"bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]\">"
 f"<p class=\"text-xs text-white/50 mb-1\">総合</p>"
-f"<p class=\"ark-stat-num text-xl font-black {judge_text_c}\">{score_total}<span class=\"text-xs font-normal text-ark-muted\">点</span></p>"
+f"<p class=\"ark-stat-num text-xl font-black {judge_text_c}\">{habit_score_total}<span class=\"text-xs font-normal text-ark-muted\">点</span></p>"
 f"{score_diff_html}</div>\n"
     "        </div>\n"
     "      </div>\n"
