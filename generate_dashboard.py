@@ -2588,7 +2588,6 @@ f"{score_diff_html}</div>\n"
     "      </div>\n"
     "    </div>\n"
     "  </section>\n"
-    + season_goals_html
     + f'''<div class="md:hidden flex gap-2 overflow-x-auto pb-1">
   <a href="#strategy" class="flex-shrink-0 flex items-center gap-1.5 bg-violet-500/15 border border-violet-500/25 rounded-full px-3 py-1.5">
     <span class="text-[10px] font-black text-violet-300">💡 今日の作戦</span>
@@ -2633,6 +2632,7 @@ f"{score_diff_html}</div>\n"
     + priority_candidates_html +
     "    </div>\n"
     "  </div>\n"
+    + season_goals_html
     + '</div>'
 
     + '<div id="weekly-view" style="display:none" class="flex flex-col gap-5">'
@@ -2678,7 +2678,7 @@ f"{score_diff_html}</div>\n"
     + '<script>var ON="tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border";var OFF="tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted";function switchTab(t){document.getElementById("daily-view").style.display=t==="daily"?"":"none";document.getElementById("weekly-view").style.display=t==="weekly"?"":"none";document.getElementById("monthly-view").style.display=t==="monthly"?"":"none";document.getElementById("badge-daily").style.display=t==="daily"?"":"none";document.getElementById("badge-weekly").style.display=t==="weekly"?"":"none";document.getElementById("badge-monthly").style.display=t==="monthly"?"":"none";document.getElementById("tab-daily").className=t==="daily"?ON:OFF;document.getElementById("tab-weekly").className=t==="weekly"?ON:OFF;document.getElementById("tab-monthly").className=t==="monthly"?ON:OFF;}function togglePrivacy(){var b=document.body;b.classList.toggle("privacy-on");var btn=document.getElementById("privacy-btn");btn.textContent=b.classList.contains("privacy-on")?"🔓 解除":"🔒 プライバシー";}</script>'
 
     "\n  <div class=\"fixed bottom-5 right-5 z-50\">\n"
-    "    <a href=\"https://summer-ark.surge.sh\" class=\"flex items-center gap-2 bg-ark-card border border-ark-border hover:border-white/30 rounded-full px-4 py-2.5 text-[11px] font-black text-white/70 hover:text-white transition-all shadow-xl\">\n"
+    "    <a href=\"https://spring-ark-home.surge.sh\" class=\"flex items-center gap-2 bg-ark-card border border-ark-border hover:border-white/30 rounded-full px-4 py-2.5 text-[11px] font-black text-white/70 hover:text-white transition-all shadow-xl\">\n"
     "      <svg class=\"w-3.5 h-3.5\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/><polyline points=\"9 22 9 12 15 12 15 22\"/></svg>\n"
     "      ホーム\n"
     "    </a>\n"
