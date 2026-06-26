@@ -10,7 +10,8 @@ GitHub Actions (force_shakti.yml) から呼び出される。
 import os
 import sys
 import requests
-from datetime import datetime, timezone, timedelta
+
+from ark_config import today_jst
 
 NOTION_TOKEN = os.environ["NOTION_API_TOKEN"]
 DATABASE_ID  = os.environ["NOTION_DATABASE_ID"]
@@ -21,8 +22,7 @@ HEADERS = {
     "Content-Type": "application/json",
 }
 
-sgt   = timezone(timedelta(hours=8))
-today = datetime.now(sgt).strftime("%Y-%m-%d")
+today = today_jst()
 
 # ── 今日のページを取得 ────────────────────────────
 res = requests.post(

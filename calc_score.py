@@ -19,8 +19,8 @@ CLI実行時は「昨日」のスコアを確定させる。
 import os
 import sys
 import requests
-from datetime import datetime, timedelta
-from zoneinfo import ZoneInfo
+
+from ark_config import CATEGORIES as ARK_CATEGORIES, yesterday_jst
 
 # ── 環境変数 ────────────────────────────────────────────────────────────────
 NOTION_TOKEN = os.environ["NOTION_TOKEN"]
@@ -32,12 +32,16 @@ HEADERS = {
     "Content-Type": "application/json",
 }
 
-# ── カテゴリ定義 (app.py と同じ構造) ─────────────────────────────────────────
+# ── カテゴリ定義 (ark_config.py から取得) ────────────────────────────────────
 CATEGORIES = [
-    {"key": "W",  "plan_prop": "【W】予定タスク",  "actual_prop": "【W】実績",  "score_prop": "【W】スコア",  "label": "Wellness"},
-    {"key": "C",  "plan_prop": "【C】予定タスク",  "actual_prop": "【C】実績",  "score_prop": "【C】スコア",  "label": "Communication"},
-    {"key": "Ca", "plan_prop": "【Ca】予定タスク", "actual_prop": "【Ca】実績", "score_prop": "【Ca】スコア", "label": "Career"},
-    {"key": "I",  "plan_prop": "【I】予定タスク",  "actual_prop": "【I】実績",  "score_prop": "【I】スコア",  "label": "Input"},
+    {
+        "key": c["key"],
+        "plan_prop": c["plan_prop"],
+        "actual_prop": c["actual_prop"],
+        "score_prop": c["score_prop"],
+        "label": c["label"],
+    }
+    for c in ARK_CATEGORIES
 ]
 
 PRIORITY_EMOJI = "🔥"
@@ -168,8 +172,8 @@ def update_scores_for_date(date_str: str) -> dict:
 
 
 def main():
-    # 昨日の日付(SGT基準)
-    yesterday = (datetime.now(ZoneInfo("Asia/Singapore")) - timedelta(days=1)).strftime("%Y-%m-%d")
+    # 昨日の日付（JST基準）
+    yesterday = yesterday_jst()
 
     print(f"[INFO] スコア計算対象日: {yesterday}")
 

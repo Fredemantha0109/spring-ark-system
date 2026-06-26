@@ -10,7 +10,21 @@ import os
 import json
 import subprocess
 import requests
-from datetime import datetime, timezone, timedelta
+from datetime import datetime, timedelta
+
+from ark_config import (
+    ARK_NAME,
+    BADGE_BY_KEY,
+    CATEGORY_BY_KEY,
+    CATEGORY_PROMPT_LEGEND,
+    JST,
+    LABEL_BY_KEY,
+    PROJECT_START,
+    SUBTITLE_BY_KEY,
+    now_jst,
+    today_jst,
+    yesterday_jst,
+)
 
 # ── 環境変数 ──────────────────────────────────────
 NOTION_TOKEN         = os.environ["NOTION_TOKEN"]
@@ -53,12 +67,12 @@ def _gcal_service():
         return None
 
 def _fetch_gcal_events(date_str):
-    """date_str (YYYY-MM-DD, SGT) の時刻付きイベントを [{name, start, end}] で返す。"""
+    """date_str (YYYY-MM-DD, JST) の時刻付きイベントを [{name, start, end}] で返す。"""
     service = _gcal_service()
     if not service:
         return None  # Noneを返すと呼び出し側でNotionにフォールバック
-    time_min = date_str + "T00:00:00+08:00"
-    time_max = date_str + "T23:59:59+08:00"
+    time_min = date_str + "T00:00:00+09:00"
+    time_max = date_str + "T23:59:59+09:00"
     try:
         result = service.events().list(
             calendarId=GOOGLE_CALENDAR_ID,
@@ -66,7 +80,7 @@ def _fetch_gcal_events(date_str):
             timeMax=time_max,
             singleEvents=True,
             orderBy="startTime",
-            timeZone="Asia/Singapore",
+            timeZone="Asia/Tokyo",
         ).execute()
         events = []
         for ev in result.get("items", []):
@@ -83,10 +97,9 @@ def _fetch_gcal_events(date_str):
         print(f"[WARN] Google Calendar fetch error ({date_str}): {e}")
         return []
 
-# ── 日付(SGT = UTC+8) ────────────────────────────
-sgt       = timezone(timedelta(hours=8))
-today     = datetime.now(sgt).strftime("%Y-%m-%d")
-yesterday = (datetime.now(sgt) - timedelta(days=1)).strftime("%Y-%m-%d")
+# ── 日付（JST = UTC+9）────────────────────────────
+today     = today_jst()
+yesterday = yesterday_jst()
 
 def fetch_page(date_str):
     res = requests.post(
@@ -490,7 +503,7 @@ def generate_monthly_training_analysis(sessions):
         return '<p style="font-size:12px;color:rgba(74,90,114,0.7);text-align:center;padding:1rem">データなし</p>'
     data_str = "\n".join(lines)
     prompt = (
-        "あなたはSpring Arkのトレーニングコーチです。\n"
+        f"あなたは{ARK_NAME}のトレーニングコーチです。\n"
         "以下の先月のトレーニング記録を分析し、JSONのみ出力してください。\n\n"
         f"{data_str}\n\n"
         '{"growth":"先月最も成長した点（60字以内）","challenge":"残っている課題（60字以内）","next":"来月への具体的提案（60字以内）"}'
@@ -648,7 +661,7 @@ def build_english_prompt_section(topic_cards, reuse_logs):
 # ── ▲ 英語学習データ取得ユーティリティ ここまで ─────
 
 # ── ▼ 英語学習AI分析 ─────────────────────────────
-def generate_english_analysis(topic_cards, reuse_logs, score_c):
+def generate_english_analysis(topic_cards, reuse_logs, score_w):
     """英語学習専用のAI分析を生成"""
     if not ANTHROPIC_API_KEY or (not topic_cards and not reuse_logs):
         return "", "", ""
@@ -667,9 +680,9 @@ def generate_english_analysis(topic_cards, reuse_logs, score_c):
         cards_str += f"・{c['topic']}（{c['group']}）: {c['score']}/5 最終:{last}{stuck_str}\n"
 
     prompt = (
-        "あなたはSpring Arkプロジェクトの英語学習コーチです。\n"
+        f"あなたは{ARK_NAME}プロジェクトの英語学習コーチです。\n"
         "以下のデータをもとに、英語学習分析を3つのセクションに分けてJSON形式で出力してください。\n\n"
-        f"【COMMUNICATIONスコア】{score_c}/100\n\n"
+        f"【ROUTINEスコア】{score_w}/100\n\n"
         f"【トピックカード状況】\n{cards_str}\n"
         f"【フレーズログ】\n"
         f"・記録数: {total}件\n"
@@ -799,7 +812,7 @@ def generate_strategy(sleep_val, cond, judge, scores, missed_tasks, weight_val="
         cal_str = "なし"
     score_str  = f"W:{scores[0]} / C:{scores[1]} / Ca:{scores[2]} / I:{scores[3]}"
     prompt = (
-        "あなたはSpring Arkプロジェクトのパーソナルコーチです。\n"
+        f"あなたは{ARK_NAME}プロジェクトのパーソナルコーチです。\n"
         "以下のデータをもとに、今日の具体的な推奨作戦を3つ、JSON形式で出力してください。\n\n"
         f"【今日のコンディション】\n"
         f"- 睡眠: {sleep_val}h\n"
@@ -854,19 +867,19 @@ missed_tasks_all = []
 for task in plan_w:
     clean = task.lstrip("🔥")
     if clean not in [d.lstrip("🔥") for d in done_w]:
-        missed_tasks_all.append((clean, "Wellness"))
+        missed_tasks_all.append((clean, LABEL_BY_KEY["W"]))
 for task in plan_c:
     clean = task.lstrip("🔥")
     if clean not in [d.lstrip("🔥") for d in done_c]:
-        missed_tasks_all.append((clean, "Communication"))
+        missed_tasks_all.append((clean, LABEL_BY_KEY["C"]))
 for task in plan_ca:
     clean = task.lstrip("🔥")
     if clean not in [d.lstrip("🔥") for d in done_ca]:
-        missed_tasks_all.append((clean, "Career"))
+        missed_tasks_all.append((clean, LABEL_BY_KEY["Ca"]))
 for task in plan_i:
     clean = task.lstrip("🔥")
     if clean not in [d.lstrip("🔥") for d in done_i]:
-        missed_tasks_all.append((clean, "Input"))
+        missed_tasks_all.append((clean, LABEL_BY_KEY["I"]))
 
 # ── 判定（睡眠時間 × 体調）────────────────────────
 def calc_judge(sleep_val, cond):
@@ -908,7 +921,7 @@ CATEGORIES = {
 def fetch_past_pages(n=5):
     pages_data = []
     for i in range(1, n + 1):
-        d = (datetime.now(sgt) - timedelta(days=i)).strftime("%Y-%m-%d")
+        d = (now_jst() - timedelta(days=i)).strftime("%Y-%m-%d")
         _, p = fetch_page(d)
         if p:
             pages_data.append((d, p))
@@ -1052,10 +1065,10 @@ def generate_agent_comment(sleep_val, cond, judge, scores, missed_tasks, weight_
         for k, v in zip(["W", "C", "Ca", "I"], scores)
     )
     prompt = (
-        "あなたはSpring Arkのパーソナルコーチです。\n"
+        f"あなたは{ARK_NAME}のパーソナルコーチです。\n"
         "以下のデータをもとに、今日のコンディションと状況を踏まえた分析コメントを2〜3文で出力してください。\n"
         "JSONではなく自然な日本語テキストのみ出力してください。\n"
-        "カテゴリ名は必ずW=Wellness、C=Communication、Ca=Career、I=Inputと表記してください。\n\n"
+        f"カテゴリ名は必ず{CATEGORY_PROMPT_LEGEND}と表記してください。\n\n"
         f"- 睡眠: {sleep_val}h / 体調: {cond} / 体重: {weight_val}kg / 判定: {judge}\n"
         f"- スコア: {score_str}\n"
         f"- 今日のカレンダー: {cal_str}\n"
@@ -1094,8 +1107,8 @@ if _gcal_result is not None:
     calendar_events = _gcal_result
 elif CALENDAR_DATABASE_ID:
     try:
-        today_start = today + "T00:00:00+08:00"
-        today_end   = today + "T23:59:59+08:00"
+        today_start = today + "T00:00:00+09:00"
+        today_end   = today + "T23:59:59+09:00"
         cal_res = requests.post(
             f"https://api.notion.com/v1/databases/{CALENDAR_DATABASE_ID}/query",
             headers=HEADERS,
@@ -1207,8 +1220,8 @@ def fetch_load_for_date(date_str):
     if not CALENDAR_DATABASE_ID:
         return "通常日"
     try:
-        day_start = date_str + "T00:00:00+08:00"
-        day_end   = date_str + "T23:59:59+08:00"
+        day_start = date_str + "T00:00:00+09:00"
+        day_end   = date_str + "T23:59:59+09:00"
         res = requests.post(
             f"https://api.notion.com/v1/databases/{CALENDAR_DATABASE_ID}/query",
             headers=HEADERS,
@@ -1338,10 +1351,10 @@ if judge_label == "危険":
 
 def make_candidate_card(rank, task_name, category, reason, gh_pat, gh_repo):
     cat_colors = {
-        "W":  ("text-green-400",  "bg-green-500/10 border-green-500/25",  "WELLNESS"),
-        "C":  ("text-amber-400",  "bg-amber-500/10 border-amber-500/25",  "COMMUNICATION"),
-        "Ca": ("text-rose-400",   "bg-rose-500/10 border-rose-500/25",    "CAREER"),
-        "I":  ("text-sky-400",    "bg-sky-500/10 border-sky-500/25",      "INPUT"),
+        "W":  ("text-green-400",  "bg-green-500/10 border-green-500/25",  BADGE_BY_KEY["W"]),
+        "C":  ("text-amber-400",  "bg-amber-500/10 border-amber-500/25",  BADGE_BY_KEY["C"]),
+        "Ca": ("text-rose-400",   "bg-rose-500/10 border-rose-500/25",    BADGE_BY_KEY["Ca"]),
+        "I":  ("text-sky-400",    "bg-sky-500/10 border-sky-500/25",      BADGE_BY_KEY["I"]),
     }
     text_c, badge_cls, cat_label = cat_colors.get(category, ("text-white", "bg-ark-dim", category))
     fn = f"forcePriority{rank}"
@@ -1413,10 +1426,9 @@ good_text_style    = "text-green-400 font-black"  if judge_label == "良好"   e
 caution_text_style = "text-amber-400 font-black"  if judge_label == "要注意" else "text-amber-500/40 font-bold"
 alert_text_style   = "text-red-400 font-black"    if judge_label == "危険"   else "text-red-500/40 font-bold"
 
-generated_at = datetime.now(sgt).strftime("%H:%M")
+generated_at = now_jst().strftime("%H:%M")
 
-PROJECT_START = datetime(2026, 4, 6, tzinfo=sgt)
-target_date   = datetime.strptime(yesterday, "%Y-%m-%d").replace(tzinfo=sgt)
+target_date   = datetime.strptime(yesterday, "%Y-%m-%d").replace(tzinfo=JST)
 delta_days    = (target_date - PROJECT_START).days
 week_num      = max(1, delta_days // 7 + 1)
 
@@ -1429,14 +1441,14 @@ elif month <= 9:
     quarter, q_start_month = 3, 7
 else:
     quarter, q_start_month = 4, 10
-q_start = datetime(target_date.year, q_start_month, 1, tzinfo=sgt)
+q_start = datetime(target_date.year, q_start_month, 1, tzinfo=JST)
 q_day   = (target_date - q_start).days + 1
 
 header_date = f"{yesterday}\u00a0·\u00a0Week\u00a0{week_num}\u00a0·\u00a0Q{quarter}-Day\u00a0{q_day}"
 
 
 # ── Weekly集計（先週月〜日）────────────────────────
-_today = datetime.now(sgt)
+_today = now_jst()
 _last_monday = _today - timedelta(days=_today.weekday() + 7)
 _last_sunday  = _last_monday + timedelta(days=6)
 w_period = f"{_last_monday.strftime('%m/%d')}（月）〜{_last_sunday.strftime('%m/%d')}（日）"
@@ -1479,10 +1491,10 @@ else:
 
 task_done_count = {}
 cat_map = {
-    "W":  ("【W】実績",  "Wellness"),
-    "C":  ("【C】実績",  "Communication"),
-    "Ca": ("【Ca】実績", "Career"),
-    "I":  ("【I】実績",  "Input"),
+    "W":  ("【W】実績",  LABEL_BY_KEY["W"]),
+    "C":  ("【C】実績",  LABEL_BY_KEY["C"]),
+    "Ca": ("【Ca】実績", LABEL_BY_KEY["Ca"]),
+    "I":  ("【I】実績",  LABEL_BY_KEY["I"]),
 }
 import re as _re
 TASK_ALIASES = {
@@ -1641,14 +1653,14 @@ monthly_reuse_logs = fetch_reuse_log_period(
 # ── ▼ 英語学習AI分析実行 ─────────────────────────
 if RUN_WEEKLY:
     w_english_overall, w_english_retention, w_english_priority = generate_english_analysis(
-        topic_cards, weekly_reuse_logs, w_score_c
+        topic_cards, weekly_reuse_logs, w_score_w
     )
 else:
     w_english_overall, w_english_retention, w_english_priority = "", "", []
 
 if RUN_MONTHLY:
     m_english_overall, m_english_retention, m_english_priority = generate_english_analysis(
-        topic_cards, monthly_reuse_logs, m_score_c
+        topic_cards, monthly_reuse_logs, m_score_w
     )
 else:
     m_english_overall, m_english_retention, m_english_priority = "", "", []
@@ -1678,7 +1690,7 @@ def generate_weekly_comment(
     missed_str = "\n".join(list(dict.fromkeys(missed_tasks_w))[:8]) or "なし"
 
     prompt = (
-        "あなたはSpring Arkプロジェクトのパーソナルコーチです。\n"
+        f"あなたは{ARK_NAME}プロジェクトのパーソナルコーチです。\n"
         "以下の週次データをもとに、分析レポートをJSON形式で出力してください。\n\n"
         f"【今週のコンディション】\n"
         f"- 体重平均: {w_weight_avg}kg\n"
@@ -1741,7 +1753,7 @@ def generate_monthly_comment(
     missed_str = "\n".join(list(dict.fromkeys(missed_tasks_m))[:10]) or "なし"
 
     prompt = (
-        "あなたはSpring Arkプロジェクトのパーソナルコーチです。\n"
+        f"あなたは{ARK_NAME}プロジェクトのパーソナルコーチです。\n"
         "以下の月次データをもとに、月次分析レポートをJSON形式で出力してください。\n\n"
         f"【今月のコンディション】\n"
         f"- 体重平均: {m_weight_avg}kg\n"
@@ -2179,24 +2191,24 @@ def weekly_task_card(name, subtitle, icon_svg, color, score, task_rows_list):
     )
 
 weekly_cards_html = (
-    weekly_task_card("WELLNESS",      "運動・食事・精神",  ICON_W,  "green", w_score_w,  weekly_task_rows["W"],  ) +
-    weekly_task_card("COMMUNICATION", "英語学習・実践",    ICON_C,  "amber", w_score_c,  weekly_task_rows["C"],  ) +
-    weekly_task_card("CAREER",        "AI・ビジネス・CPA", ICON_CA, "rose",  w_score_ca, weekly_task_rows["Ca"], ) +
-    weekly_task_card("INPUT",         "読書・NewsPicks",   ICON_I,  "sky",   w_score_i,  weekly_task_rows["I"],  )
+    weekly_task_card(BADGE_BY_KEY["W"],  SUBTITLE_BY_KEY["W"],  ICON_W,  CATEGORY_BY_KEY["W"]["color"],  w_score_w,  weekly_task_rows["W"],  ) +
+    weekly_task_card(BADGE_BY_KEY["C"],  SUBTITLE_BY_KEY["C"],  ICON_C,  CATEGORY_BY_KEY["C"]["color"],  w_score_c,  weekly_task_rows["C"],  ) +
+    weekly_task_card(BADGE_BY_KEY["Ca"], SUBTITLE_BY_KEY["Ca"], ICON_CA, CATEGORY_BY_KEY["Ca"]["color"], w_score_ca, weekly_task_rows["Ca"], ) +
+    weekly_task_card(BADGE_BY_KEY["I"],  SUBTITLE_BY_KEY["I"],  ICON_I,  CATEGORY_BY_KEY["I"]["color"],  w_score_i,  weekly_task_rows["I"],  )
 )
 
 monthly_cards_html = (
-    weekly_task_card("WELLNESS",      "運動・食事・精神",  ICON_W,  "green", m_score_w,  monthly_task_rows["W"],  ) +
-    weekly_task_card("COMMUNICATION", "英語学習・実践",    ICON_C,  "amber", m_score_c,  monthly_task_rows["C"],  ) +
-    weekly_task_card("CAREER",        "AI・ビジネス・CPA", ICON_CA, "rose",  m_score_ca, monthly_task_rows["Ca"], ) +
-    weekly_task_card("INPUT",         "読書・NewsPicks",   ICON_I,  "sky",   m_score_i,  monthly_task_rows["I"],  )
+    weekly_task_card(BADGE_BY_KEY["W"],  SUBTITLE_BY_KEY["W"],  ICON_W,  CATEGORY_BY_KEY["W"]["color"],  m_score_w,  monthly_task_rows["W"],  ) +
+    weekly_task_card(BADGE_BY_KEY["C"],  SUBTITLE_BY_KEY["C"],  ICON_C,  CATEGORY_BY_KEY["C"]["color"],  m_score_c,  monthly_task_rows["C"],  ) +
+    weekly_task_card(BADGE_BY_KEY["Ca"], SUBTITLE_BY_KEY["Ca"], ICON_CA, CATEGORY_BY_KEY["Ca"]["color"], m_score_ca, monthly_task_rows["Ca"], ) +
+    weekly_task_card(BADGE_BY_KEY["I"],  SUBTITLE_BY_KEY["I"],  ICON_I,  CATEGORY_BY_KEY["I"]["color"],  m_score_i,  monthly_task_rows["I"],  )
 )
 
 cards_html = (
-    category_card("WELLNESS",      "運動・食事・精神",  ICON_W,  "green", score_w,  plan_w,  done_w)  +
-    category_card("COMMUNICATION", "英語学習・実践",    ICON_C,  "amber", score_c,  plan_c,  done_c)  +
-    category_card("CAREER",        "AI・ビジネス・CPA", ICON_CA, "rose",  score_ca, plan_ca, done_ca) +
-    category_card("INPUT",         "読書・NewsPicks",   ICON_I,  "sky",   score_i,  plan_i,  done_i)
+    category_card(BADGE_BY_KEY["W"],  SUBTITLE_BY_KEY["W"],  ICON_W,  CATEGORY_BY_KEY["W"]["color"],  score_w,  plan_w,  done_w)  +
+    category_card(BADGE_BY_KEY["C"],  SUBTITLE_BY_KEY["C"],  ICON_C,  CATEGORY_BY_KEY["C"]["color"],  score_c,  plan_c,  done_c)  +
+    category_card(BADGE_BY_KEY["Ca"], SUBTITLE_BY_KEY["Ca"], ICON_CA, CATEGORY_BY_KEY["Ca"]["color"], score_ca, plan_ca, done_ca) +
+    category_card(BADGE_BY_KEY["I"],  SUBTITLE_BY_KEY["I"],  ICON_I,  CATEGORY_BY_KEY["I"]["color"],  score_i,  plan_i,  done_i)
 )
 
 # ── HTML組み立て ──────────────────────────────────
@@ -2206,7 +2218,7 @@ html = (
     "<head>\n"
     '  <meta charset="UTF-8">\n'
     '  <meta name="viewport" content="width=device-width, initial-scale=1.0">\n'
-    "  <title>SPRING ARK — Daily Dashboard</title>\n"
+    f"  <title>{ARK_NAME} — Daily Dashboard</title>\n"
     '  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900'
     '&family=Noto+Sans+JP:wght@400;500;700;900&display=swap" rel="stylesheet">\n'
     '  <script src="https://cdn.tailwindcss.com?plugins="></script>\n'
@@ -2279,7 +2291,7 @@ html = (
     "\n  <header class=\"flex items-start justify-between\">\n"
     "    <div>\n"
     "      <div class=\"flex items-baseline gap-2.5 mb-1\">\n"
-    "        <h1 class=\"text-2xl font-black tracking-tight\">SPRING ARK</h1>\n"
+    f"        <h1 class=\"text-2xl font-black tracking-tight\">{ARK_NAME}</h1>\n"
     "<div class=\"inline-flex bg-ark-dim rounded-full p-0.5 gap-0.5\"><button id=\"tab-daily\" onclick=\"switchTab('daily')\" class=\"tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border\">Daily</button><button id=\"tab-weekly\" onclick=\"switchTab('weekly')\" class=\"tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted\">Weekly</button><button id=\"tab-monthly\" onclick=\"switchTab('monthly')\" class=\"tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted\">Monthly</button></div>\n"
     "      </div>\n"
     f"      <p class=\"text-xs text-white/50\">{header_date}</p>\n"
@@ -2432,14 +2444,14 @@ f"{score_diff_html}</div>\n"
     + '<script>var ON="tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all bg-ark-card text-white border border-ark-border";var OFF="tab-btn text-[11px] font-bold rounded-full px-3 py-1 transition-all text-ark-muted";function switchTab(t){document.getElementById("daily-view").style.display=t==="daily"?"":"none";document.getElementById("weekly-view").style.display=t==="weekly"?"":"none";document.getElementById("monthly-view").style.display=t==="monthly"?"":"none";document.getElementById("badge-daily").style.display=t==="daily"?"":"none";document.getElementById("badge-weekly").style.display=t==="weekly"?"":"none";document.getElementById("badge-monthly").style.display=t==="monthly"?"":"none";document.getElementById("tab-daily").className=t==="daily"?ON:OFF;document.getElementById("tab-weekly").className=t==="weekly"?ON:OFF;document.getElementById("tab-monthly").className=t==="monthly"?ON:OFF;}function togglePrivacy(){var b=document.body;b.classList.toggle("privacy-on");var btn=document.getElementById("privacy-btn");btn.textContent=b.classList.contains("privacy-on")?"🔓 解除":"🔒 プライバシー";}</script>'
 
     "\n  <div class=\"fixed bottom-5 right-5 z-50\">\n"
-    "    <a href=\"https://spring-ark-home.surge.sh\" class=\"flex items-center gap-2 bg-ark-card border border-ark-border hover:border-white/30 rounded-full px-4 py-2.5 text-[11px] font-black text-white/70 hover:text-white transition-all shadow-xl\">\n"
+    "    <a href=\"https://summer-ark.surge.sh\" class=\"flex items-center gap-2 bg-ark-card border border-ark-border hover:border-white/30 rounded-full px-4 py-2.5 text-[11px] font-black text-white/70 hover:text-white transition-all shadow-xl\">\n"
     "      <svg class=\"w-3.5 h-3.5\" viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-width=\"2\"><path d=\"M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z\"/><polyline points=\"9 22 9 12 15 12 15 22\"/></svg>\n"
     "      ホーム\n"
     "    </a>\n"
     "  </div>\n"
     "\n  <footer class=\"flex items-center justify-between pt-1 pb-3\">\n"
-    "    <p class=\"text-[9px] text-ark-muted\">SPRING ARK &copy; 2026</p>\n"
-    f"    <p class=\"text-[9px] text-ark-muted\">Generated at {generated_at} SGT</p>\n"
+    f"    <p class=\"text-[9px] text-ark-muted\">{ARK_NAME} &copy; 2026</p>\n"
+    f"    <p class=\"text-[9px] text-ark-muted\">Generated at {generated_at} JST</p>\n"
     "  </footer>\n"
 
     "</div>\n"

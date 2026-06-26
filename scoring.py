@@ -1,6 +1,11 @@
 import os
 import requests
-from datetime import datetime, timedelta
+
+from ark_config import CATEGORIES, LABEL_BY_KEY, today_jst, yesterday_jst
+
+# 日付は JST 基準。旧実装の datetime.now()（タイムゾーン未指定）は GitHub Actions
+# ランナー（UTC）上で日付境界がずれる既存バグがあった。今回の修正で解消する。
+# ※過去のスコア確定データの遡及修正は不要。今後の計算から正しくなる。
 
 # 環境変数の取得（Secretで設定したもの）
 NOTION_TOKEN = os.environ['NOTION_TOKEN']
@@ -19,8 +24,8 @@ def get_page_by_date(date_str):
     return response['results'][0] if response['results'] else None
 
 def analyze():
-    yesterday = (datetime.now() - timedelta(days=1)).strftime('%Y-%m-%d')
-    today = datetime.now().strftime('%Y-%m-%d')
+    yesterday = yesterday_jst()
+    today = today_jst()
     
     y_page = get_page_by_date(yesterday)
     t_page = get_page_by_date(today)
@@ -33,10 +38,8 @@ def analyze():
         return
 
     categories = [
-        {"prefix": "W", "name": "Wellness"},
-        {"prefix": "C", "name": "Communication"},
-        {"prefix": "Ca", "name": "Career"},
-        {"prefix": "I", "name": "Input"}
+        {"prefix": c["key"], "name": LABEL_BY_KEY[c["key"]]}
+        for c in CATEGORIES
     ]
     
     unfinished = []
