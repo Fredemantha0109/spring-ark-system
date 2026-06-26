@@ -34,11 +34,13 @@ COMPLETION_CRITERIA = [
     "振り返り＋Winter Ark準備完了",
 ]
 
-# ── トレーニング目標（プレースホルダー）──────────────────────────────────────
-# TODO: 別チャットで確定後に差し替え
+# ── シーズン目標（Summer Ark）──────────────────────────────────────────────
 TRAINING_TARGETS = {
-    "bench_press_kg": None,
-    "body_weight_kg": None,
+    "bench_press_kg": {"label": "ベンチプレス", "target": 70, "stretch": 72.5, "unit": "kg"},
+    "squat_kg": {"label": "スクワット", "target": 105, "stretch": 110, "unit": "kg"},
+    "pullup_reps": {"label": "懸垂", "target": 8, "stretch": 10, "unit": "回", "higher_is_better": True},
+    "body_weight_kg": {"label": "体重", "target": 62.9, "stretch": 61.9, "unit": "kg", "higher_is_better": False},
+    "body_fat_pct": {"label": "体脂肪率", "target": 18.9, "stretch": 15.9, "unit": "%", "higher_is_better": False},
 }
 
 # ── 4柱定義（キー・Notionプロパティ名は不変）────────────────────────────────

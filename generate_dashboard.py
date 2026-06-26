@@ -23,6 +23,7 @@ from ark_config import (
     ROUTINE_SUBCATEGORY_EMOJI,
     ROUTINE_SUBCATEGORY_ORDER,
     SUBTITLE_BY_KEY,
+    TRAINING_TARGETS,
     classify_routine_subcategory,
     now_jst,
     today_jst,
@@ -463,6 +464,172 @@ def training_card_html(sessions, title):
         '<svg class="w-3.5 h-3.5 text-violet-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M4 12h16M4 18h16"/></svg>'
         f'<p class="text-[10px] font-black text-violet-400 tracking-[.15em]">{title}</p>'
         '</div>' + rows + '</div>'
+    )
+
+
+# ── シーズン目標（SEASON GOALS）────────────────────────
+SEASON_GOAL_SHUMOKU = {
+    "bench_press_kg": "ベンチプレス",
+    "squat_kg": "スクワット",
+    "pullup_reps": "懸垂",
+}
+SEASON_GOAL_DAILY_PROPS = {
+    "body_weight_kg": "体重",
+    "body_fat_pct": "体脂肪率",
+}
+
+
+def fetch_latest_training_shumoku(shumoku_name):
+    """トレーニングログDBから種目の直近実績を取得（実績0はスキップ）。"""
+    if not TRAINING_DATABASE_ID:
+        return None
+    try:
+        res = requests.post(
+            f"https://api.notion.com/v1/databases/{TRAINING_DATABASE_ID}/query",
+            headers=HEADERS,
+            json={
+                "filter": {"property": "種目", "select": {"equals": shumoku_name}},
+                "sorts": [{"property": "日付", "direction": "descending"}],
+                "page_size": 30,
+            },
+            timeout=10,
+        )
+        for r in res.json().get("results", []):
+            jisseki = r.get("properties", {}).get("実績", {}).get("number")
+            if jisseki is not None and jisseki > 0:
+                return jisseki
+        return None
+    except Exception as e:
+        print(f"[WARN] Training latest fetch error ({shumoku_name}): {e}")
+        return None
+
+
+def fetch_latest_pullup_reps():
+    """懸垂の直近『回数』を取得（実績=補助重量が0または未入力＝自重の行のみ対象）。
+
+    懸垂レコードの『実績』『目標』列は反復回数ではなく補助重量(kg)を表すため、
+    シーズン目標（自重◯回）には『回数』列を使う。補助ありの行は除外する。
+    """
+    if not TRAINING_DATABASE_ID:
+        return None
+    try:
+        res = requests.post(
+            f"https://api.notion.com/v1/databases/{TRAINING_DATABASE_ID}/query",
+            headers=HEADERS,
+            json={
+                "filter": {"property": "種目", "select": {"equals": "懸垂"}},
+                "sorts": [{"property": "日付", "direction": "descending"}],
+                "page_size": 30,
+            },
+            timeout=10,
+        )
+        for r in res.json().get("results", []):
+            p = r.get("properties", {})
+            assist = p.get("実績", {}).get("number")   # 補助重量(kg)
+            reps   = p.get("回数", {}).get("number")    # 反復回数
+            if (assist is None or assist == 0) and reps is not None and reps > 0:
+                return reps
+        return None
+    except Exception as e:
+        print(f"[WARN] Pullup fetch error: {e}")
+        return None
+
+
+def fetch_latest_daily_log_number(prop_name):
+    """Daily Log から指定 number プロパティの最新値を取得。"""
+    try:
+        res = requests.post(
+            f"https://api.notion.com/v1/databases/{DATABASE_ID}/query",
+            headers=HEADERS,
+            json={
+                "filter": {"property": prop_name, "number": {"is_not_empty": True}},
+                "sorts": [{"property": "日付", "direction": "descending"}],
+                "page_size": 1,
+            },
+            timeout=10,
+        )
+        results = res.json().get("results", [])
+        if not results:
+            return None
+        return results[0].get("properties", {}).get(prop_name, {}).get("number")
+    except Exception as e:
+        print(f"[WARN] Daily Log latest fetch error ({prop_name}): {e}")
+        return None
+
+
+def _season_goal_met(current, target, higher_is_better):
+    if current is None:
+        return False
+    return current >= target if higher_is_better else current <= target
+
+
+def _fmt_season_value(val, unit):
+    if unit == "回":
+        return f"{int(val)}{unit}" if val == int(val) else f"{val:g}{unit}"
+    return f"{val:g}{unit}"
+
+
+def _collect_season_goal_currents():
+    """TRAINING_TARGETS 各項目の現在値を動的取得。"""
+    currents = {}
+    for key, spec in TRAINING_TARGETS.items():
+        if key == "pullup_reps":
+            currents[key] = fetch_latest_pullup_reps()
+        elif key in SEASON_GOAL_SHUMOKU:
+            currents[key] = fetch_latest_training_shumoku(SEASON_GOAL_SHUMOKU[key])
+        elif key in SEASON_GOAL_DAILY_PROPS:
+            currents[key] = fetch_latest_daily_log_number(SEASON_GOAL_DAILY_PROPS[key])
+        else:
+            currents[key] = None
+    return currents
+
+
+def season_goals_card_html(currents):
+    """Daily用：シーズン目標カード（現在 → 目標 → ストレッチ）。"""
+    rows = ""
+    for key, spec in TRAINING_TARGETS.items():
+        label = spec["label"]
+        target = spec["target"]
+        stretch = spec["stretch"]
+        unit = spec["unit"]
+        higher = spec.get("higher_is_better", True)
+        current = currents.get(key)
+
+        target_disp = _fmt_season_value(target, unit)
+        stretch_disp = _fmt_season_value(stretch, unit)
+        met = _season_goal_met(current, target, higher)
+        target_cls = "text-green-400" if met else "text-amber-400"
+        check = " ✓" if met else ""
+
+        if key == "body_fat_pct" and current is None:
+            current_html = '<span class="text-white/30 font-bold">未測定</span>'
+        elif current is None:
+            current_html = '<span class="text-white/30 font-bold">データなし</span>'
+        else:
+            current_html = f'<span class="font-black text-white">{_fmt_season_value(current, unit)}</span>'
+
+        rows += (
+            f'<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 py-2.5 border-b border-ark-border/30 last:border-0">'
+            f'<p class="text-xs font-bold text-white/80 sm:w-24 flex-shrink-0">{label}</p>'
+            f'<div class="flex flex-wrap items-center gap-1.5 text-xs sm:justify-end">'
+            f'{current_html}'
+            f'<span class="text-ark-muted">→</span>'
+            f'<span class="font-bold {target_cls}">目標{target_disp}{check}</span>'
+            f'<span class="text-ark-muted">→</span>'
+            f'<span class="text-white/50">ストレッチ{stretch_disp}</span>'
+            f'</div></div>'
+        )
+
+    return (
+        '<section class="mt-1">'
+        '<span class="text-[10px] font-bold text-white/50 tracking-[.2em] uppercase block mb-2">Season Goals</span>'
+        '<div class="stripe bg-ark-card border border-emerald-500/15 rounded-2xl p-4">'
+        '<div class="flex items-center gap-2 mb-2">'
+        '<svg class="w-3.5 h-3.5 text-emerald-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">'
+        '<path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>'
+        '</svg>'
+        '<p class="text-[10px] font-black text-emerald-400 tracking-[.15em]">SEASON GOALS</p>'
+        '</div>' + rows + '</div></section>'
     )
 
 
@@ -1702,6 +1869,8 @@ today_training   = fetch_training_data(yesterday)
 weekly_training  = fetch_training_period(_last_monday.strftime("%Y-%m-%d"), _last_sunday.strftime("%Y-%m-%d"))
 monthly_training = fetch_training_period(_last_month_start.strftime("%Y-%m-%d"), _last_month_end.strftime("%Y-%m-%d"))
 today_training_html   = training_card_html(today_training,  "YESTERDAY'S TRAINING")
+season_goal_currents  = _collect_season_goal_currents()
+season_goals_html     = season_goals_card_html(season_goal_currents)
 weekly_training_html  = training_summary_html(weekly_training,  "WEEKLY")
 monthly_training_html = generate_monthly_training_analysis(monthly_training)
 # ── ▲ トレーニングデータ取得ここまで ─────────────
@@ -2419,9 +2588,8 @@ f"{score_diff_html}</div>\n"
     "      </div>\n"
     "    </div>\n"
     "  </section>\n"
-
-    # ── モバイル専用サマリーバー ──────────────────────
-+ f'''<div class="md:hidden flex gap-2 overflow-x-auto pb-1">
+    + season_goals_html
+    + f'''<div class="md:hidden flex gap-2 overflow-x-auto pb-1">
   <a href="#strategy" class="flex-shrink-0 flex items-center gap-1.5 bg-violet-500/15 border border-violet-500/25 rounded-full px-3 py-1.5">
     <span class="text-[10px] font-black text-violet-300">💡 今日の作戦</span>
   </a>
