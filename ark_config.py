@@ -226,6 +226,36 @@ def build_missed_habit_tasks(plan_tasks, done_tasks):
     return missed
 
 
+def _page_w_tasks(props, key):
+    return [t["name"] for t in props.get(key, {}).get("multi_select", [])]
+
+
+def habit_avg(pages):
+    """期間内の各日【W】タスクから習慣4分類の週/月平均スコアを算出。
+
+    pages: [(date_str, properties), ...]
+    各分類は「予定タスクがあった日」のスコアのみ平均（0件の日は除外）。
+    総合は期間内に1回でも予定があった分類のみで単純平均。
+    """
+    daily_scores = []
+    for _, p in pages:
+        scores, _, _, _ = compute_habit_scores(
+            _page_w_tasks(p, "【W】予定タスク"),
+            _page_w_tasks(p, "【W】実績"),
+        )
+        daily_scores.append(scores)
+
+    result = {}
+    for cat in HABIT_CATEGORIES:
+        key = cat["key"]
+        vals = [s[key] for s in daily_scores if s[key] is not None]
+        result[key] = round(sum(vals) / len(vals)) if vals else None
+
+    valid = [v for v in result.values() if v is not None]
+    total = round(sum(valid) / len(valid)) if valid else 0
+    return result, total
+
+
 # 表示用: "🔁 Routine"
 def category_display(key: str) -> str:
     c = CATEGORY_BY_KEY[key]

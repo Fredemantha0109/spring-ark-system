@@ -20,6 +20,7 @@ from ark_config import (
     HABIT_PROMPT_LEGEND,
     build_missed_habit_tasks,
     compute_habit_scores,
+    habit_avg,
     JST,
     LABEL_BY_KEY,
     PROJECT_START,
@@ -1689,19 +1690,7 @@ for i in range(7):
     if p:
         weekly_pages.append((d, p))
 
-def w_avg(key):
-    vals = []
-    for _, p in weekly_pages:
-        v = p.get(key, {}).get("formula", {}).get("number")
-        if v is not None:
-            vals.append(v)
-    return round(sum(vals) / len(vals)) if vals else 0
-
-w_score_w  = w_avg("【W】スコア")
-w_score_c  = w_avg("【C】スコア")
-w_score_ca = w_avg("【Ca】スコア")
-w_score_i  = w_avg("【I】スコア")
-w_score_total = round((w_score_w + w_score_c + w_score_ca + w_score_i) / 4)
+w_habit_scores, w_habit_score_total = habit_avg(weekly_pages)
 
 w_weights = [p.get("体重", {}).get("number") for _, p in weekly_pages if p.get("体重", {}).get("number")]
 w_sleeps  = [p.get("睡眠時間", {}).get("number") for _, p in weekly_pages if p.get("睡眠時間", {}).get("number")]
@@ -1719,13 +1708,8 @@ if cond_counts:
 else:
     w_cond_summary = "-"
 
-task_done_count = {}
-cat_map = {
-    "W":  ("【W】実績",  LABEL_BY_KEY["W"]),
-    "C":  ("【C】実績",  LABEL_BY_KEY["C"]),
-    "Ca": ("【Ca】実績", LABEL_BY_KEY["Ca"]),
-    "I":  ("【I】実績",  LABEL_BY_KEY["I"]),
-}
+habit_done_count = {}
+_subcat_to_habit_key = {c["subcategory"]: c["key"] for c in HABIT_CATEGORIES}
 import re as _re
 TASK_ALIASES = {
     "ライアン": "動画視聴",
@@ -1738,17 +1722,18 @@ def normalize_task(name):
     return TASK_ALIASES.get(base, base)
 
 for _, p in weekly_pages:
-    for cat_key, (done_key, cat_name) in cat_map.items():
-        tasks = [t["name"].lstrip("🔥") for t in p.get(done_key, {}).get("multi_select", [])]
-        for task in tasks:
-            normalized = normalize_task(task)
-            k = (normalized, cat_key)
-            task_done_count[k] = task_done_count.get(k, 0) + 1
+    tasks = [t["name"].lstrip("🔥") for t in p.get("【W】実績", {}).get("multi_select", [])]
+    for task in tasks:
+        normalized = normalize_task(task)
+        habit_key = _subcat_to_habit_key.get(classify_routine_subcategory(normalized))
+        if habit_key:
+            k = (normalized, habit_key)
+            habit_done_count[k] = habit_done_count.get(k, 0) + 1
 
-weekly_task_rows = {}
-for cat_key in ["W", "C", "Ca", "I"]:
-    rows = [(t, c) for (t, c), cnt in sorted(task_done_count.items(), key=lambda x: -x[1]) if c == cat_key]
-    weekly_task_rows[cat_key] = rows
+weekly_habit_task_rows = {}
+for cat in HABIT_CATEGORIES:
+    rows = [(t, h) for (t, h), cnt in sorted(habit_done_count.items(), key=lambda x: -x[1]) if h == cat["key"]]
+    weekly_habit_task_rows[cat["key"]] = rows
 
 # ── Monthly集計（先月1日〜末日）────────────────────────
 _first_this_month = _today.replace(day=1)
@@ -1763,19 +1748,7 @@ while _d <= _last_month_end:
         monthly_pages.append((_d.strftime("%Y-%m-%d"), p))
     _d += timedelta(days=1)
 
-def m_avg(key):
-    vals = []
-    for _, p in monthly_pages:
-        v = p.get(key, {}).get("formula", {}).get("number")
-        if v is not None:
-            vals.append(v)
-    return round(sum(vals) / len(vals)) if vals else 0
-
-m_score_w  = m_avg("【W】スコア")
-m_score_c  = m_avg("【C】スコア")
-m_score_ca = m_avg("【Ca】スコア")
-m_score_i  = m_avg("【I】スコア")
-m_score_total = round((m_score_w + m_score_c + m_score_ca + m_score_i) / 4)
+m_habit_scores, m_habit_score_total = habit_avg(monthly_pages)
 
 m_weights = [p.get("体重", {}).get("number") for _, p in monthly_pages if p.get("体重", {}).get("number")]
 m_sleeps  = [p.get("睡眠時間", {}).get("number") for _, p in monthly_pages if p.get("睡眠時間", {}).get("number")]
@@ -1793,23 +1766,24 @@ if m_cond_counts:
 else:
     m_cond_summary = "-"
 
-m_task_done_count = {}
+m_habit_done_count = {}
 for _, p in monthly_pages:
-    for cat_key, (done_key, cat_name) in cat_map.items():
-        tasks = [t["name"].lstrip("🔥") for t in p.get(done_key, {}).get("multi_select", [])]
-        for task in tasks:
-            normalized = normalize_task(task)
-            k = (normalized, cat_key)
-            m_task_done_count[k] = m_task_done_count.get(k, 0) + 1
+    tasks = [t["name"].lstrip("🔥") for t in p.get("【W】実績", {}).get("multi_select", [])]
+    for task in tasks:
+        normalized = normalize_task(task)
+        habit_key = _subcat_to_habit_key.get(classify_routine_subcategory(normalized))
+        if habit_key:
+            k = (normalized, habit_key)
+            m_habit_done_count[k] = m_habit_done_count.get(k, 0) + 1
 
-monthly_task_rows = {}
-for cat_key in ["W", "C", "Ca", "I"]:
-    rows = [(t, c) for (t, c), cnt in sorted(m_task_done_count.items(), key=lambda x: -x[1]) if c == cat_key]
-    monthly_task_rows[cat_key] = rows
+monthly_habit_task_rows = {}
+for cat in HABIT_CATEGORIES:
+    rows = [(t, h) for (t, h), cnt in sorted(m_habit_done_count.items(), key=lambda x: -x[1]) if h == cat["key"]]
+    monthly_habit_task_rows[cat["key"]] = rows
 
-if m_score_total >= 80:
+if m_habit_score_total >= 80:
     m_judge_label, m_judge_color = "🏅絶好調", "green"
-elif m_score_total >= 50:
+elif m_habit_score_total >= 50:
     m_judge_label, m_judge_color = "📊成長中", "amber"
 else:
     m_judge_label, m_judge_color = "🔄要改善", "red"
@@ -1827,7 +1801,7 @@ m_badge_html = majority_load([d for d, _ in monthly_pages], "月")
 weight_diff_html = diff_label(weight, w_weight_avg, "kg")
 sleep_diff_html  = diff_label(sleep,  w_sleep_avg,  "h")
 
-score_diff = round(habit_score_total - w_score_total) if w_score_total else 0
+score_diff = round(habit_score_total - w_habit_score_total) if w_habit_score_total else 0
 if score_diff > 0:
     score_diff_html = f'<span class="text-[9px] text-green-400 font-bold block mt-0.5">+{score_diff}点</span>'
 elif score_diff < 0:
@@ -1885,14 +1859,14 @@ monthly_reuse_logs = fetch_reuse_log_period(
 # ── ▼ 英語学習AI分析実行 ─────────────────────────
 if RUN_WEEKLY:
     w_english_overall, w_english_retention, w_english_priority = generate_english_analysis(
-        topic_cards, weekly_reuse_logs, w_score_w
+        topic_cards, weekly_reuse_logs, w_habit_scores.get("english") or 0
     )
 else:
     w_english_overall, w_english_retention, w_english_priority = "", "", []
 
 if RUN_MONTHLY:
     m_english_overall, m_english_retention, m_english_priority = generate_english_analysis(
-        topic_cards, monthly_reuse_logs, m_score_w
+        topic_cards, monthly_reuse_logs, m_habit_scores.get("english") or 0
     )
 else:
     m_english_overall, m_english_retention, m_english_priority = "", "", []
@@ -1900,36 +1874,38 @@ else:
 
 
 # ── ▼ generate_weekly_comment（ジャーナリング統合版）
-# Stage3: Weekly/Monthly は W/C/Ca/I のまま。新4分類対応は次ステージ。
 def generate_weekly_comment(
-    w_score_w, w_score_c, w_score_ca, w_score_i, w_score_total,
-    w_weight_avg, w_sleep_avg, w_cond_summary, task_done_count,
+    habit_scores, habit_score_total,
+    w_weight_avg, w_sleep_avg, w_cond_summary, habit_done_count,
 ):
     if not ANTHROPIC_API_KEY:
         return [], ""
 
-    top_tasks = sorted(task_done_count.items(), key=lambda x: -x[1])[:10]
-    done_str = "\n".join([f"・{t}({c}): {cnt}回" for (t, c), cnt in top_tasks]) or "なし"
+    _habit_label = {c["key"]: c["label"] for c in HABIT_CATEGORIES}
+    top_tasks = sorted(habit_done_count.items(), key=lambda x: -x[1])[:10]
+    done_str = "\n".join([f"・{t}({_habit_label.get(h, h)}): {cnt}回" for (t, h), cnt in top_tasks]) or "なし"
 
     missed_tasks_w = []
     for _, p in weekly_pages:
-        for cat_key, (done_key, cat_name) in cat_map.items():
-            plan_key = f"【{cat_key}】予定タスク"
-            plan = [t["name"].lstrip("🔥") for t in p.get(plan_key, {}).get("multi_select", [])]
-            done = [t["name"].lstrip("🔥") for t in p.get(done_key, {}).get("multi_select", [])]
-            for task in plan:
-                if task not in done:
-                    missed_tasks_w.append(f"{cat_name}: {task}")
+        plan_w = [t["name"] for t in p.get("【W】予定タスク", {}).get("multi_select", [])]
+        done_w = [t["name"] for t in p.get("【W】実績", {}).get("multi_select", [])]
+        for task, label in build_missed_habit_tasks(plan_w, done_w):
+            missed_tasks_w.append(f"{label}: {task}")
     missed_str = "\n".join(list(dict.fromkeys(missed_tasks_w))[:8]) or "なし"
 
+    score_str = " / ".join(
+        f"{c['label']}:{habit_scores.get(c['key']) if habit_scores.get(c['key']) is not None else '-'}"
+        for c in HABIT_CATEGORIES
+    )
     prompt = (
         f"あなたは{ARK_NAME}プロジェクトのパーソナルコーチです。\n"
-        "以下の週次データをもとに、分析レポートをJSON形式で出力してください。\n\n"
+        "以下の週次データをもとに、分析レポートをJSON形式で出力してください。\n"
+        f"カテゴリ名は必ず{HABIT_PROMPT_LEGEND}と表記してください。\n\n"
         f"【今週のコンディション】\n"
         f"- 体重平均: {w_weight_avg}kg\n"
         f"- 睡眠平均: {w_sleep_avg}h\n"
         f"- 体調: {w_cond_summary}\n"
-        f"- 週平均スコア: W:{w_score_w} / C:{w_score_c} / Ca:{w_score_ca} / I:{w_score_i} / 総合:{w_score_total}\n\n"
+        f"- 週平均スコア: {score_str} / 総合:{habit_score_total}\n\n"
         f"【実施できた主なタスク】\n{done_str}\n\n"
         f"【未達が多かったタスク】\n{missed_str}\n"
         "\n【総合分析の指示】体重・睡眠・体調・完了タスク・未達タスクを総合的に踏まえた今週の総合評価・考察・改善提案を200字程度で記載。来週への具体的アクションも含めること。\n"
@@ -1964,36 +1940,38 @@ def generate_weekly_comment(
 
 
 # ── ▼ generate_monthly_comment（ジャーナリング統合版）
-# Stage3: Weekly/Monthly は W/C/Ca/I のまま。新4分類対応は次ステージ。
 def generate_monthly_comment(
-    m_score_w, m_score_c, m_score_ca, m_score_i, m_score_total,
-    m_weight_avg, m_sleep_avg, m_cond_summary, m_task_done_count,
+    habit_scores, habit_score_total,
+    m_weight_avg, m_sleep_avg, m_cond_summary, habit_done_count,
 ):
     if not ANTHROPIC_API_KEY:
         return [], ""
 
-    top_tasks = sorted(m_task_done_count.items(), key=lambda x: -x[1])[:12]
-    done_str = "\n".join([f"・{t}({c}): {cnt}回" for (t, c), cnt in top_tasks]) or "なし"
+    _habit_label = {c["key"]: c["label"] for c in HABIT_CATEGORIES}
+    top_tasks = sorted(habit_done_count.items(), key=lambda x: -x[1])[:12]
+    done_str = "\n".join([f"・{t}({_habit_label.get(h, h)}): {cnt}回" for (t, h), cnt in top_tasks]) or "なし"
 
     missed_tasks_m = []
     for _, p in monthly_pages:
-        for cat_key, (done_key, cat_name) in cat_map.items():
-            plan_key = f"【{cat_key}】予定タスク"
-            plan = [t["name"].lstrip("🔥") for t in p.get(plan_key, {}).get("multi_select", [])]
-            done = [t["name"].lstrip("🔥") for t in p.get(done_key, {}).get("multi_select", [])]
-            for task in plan:
-                if task not in done:
-                    missed_tasks_m.append(f"{cat_name}: {task}")
+        plan_w = [t["name"] for t in p.get("【W】予定タスク", {}).get("multi_select", [])]
+        done_w = [t["name"] for t in p.get("【W】実績", {}).get("multi_select", [])]
+        for task, label in build_missed_habit_tasks(plan_w, done_w):
+            missed_tasks_m.append(f"{label}: {task}")
     missed_str = "\n".join(list(dict.fromkeys(missed_tasks_m))[:10]) or "なし"
 
+    score_str = " / ".join(
+        f"{c['label']}:{habit_scores.get(c['key']) if habit_scores.get(c['key']) is not None else '-'}"
+        for c in HABIT_CATEGORIES
+    )
     prompt = (
         f"あなたは{ARK_NAME}プロジェクトのパーソナルコーチです。\n"
-        "以下の月次データをもとに、月次分析レポートをJSON形式で出力してください。\n\n"
+        "以下の月次データをもとに、月次分析レポートをJSON形式で出力してください。\n"
+        f"カテゴリ名は必ず{HABIT_PROMPT_LEGEND}と表記してください。\n\n"
         f"【今月のコンディション】\n"
         f"- 体重平均: {m_weight_avg}kg\n"
         f"- 睡眠平均: {m_sleep_avg}h\n"
         f"- 体調: {m_cond_summary}\n"
-        f"- 月平均スコア: W:{m_score_w} / C:{m_score_c} / Ca:{m_score_ca} / I:{m_score_i} / 総合:{m_score_total}\n\n"
+        f"- 月平均スコア: {score_str} / 総合:{habit_score_total}\n\n"
         f"【実施できた主なタスク（上位）】\n{done_str}\n\n"
         f"【未達が多かったタスク】\n{missed_str}\n"
         "\n【総合分析の指示】体重・睡眠・体調・完了タスク・未達タスクを総合的に踏まえた今月の総合評価・考察・改善提案を200字程度で記載。来月への具体的な一つの実験も含めること。\n"
@@ -2101,8 +2079,8 @@ m_english_panel_html = make_english_panel_html(
 
 if RUN_MONTHLY:
     monthly_summaries, monthly_analysis = generate_monthly_comment(
-        m_score_w, m_score_c, m_score_ca, m_score_i, m_score_total,
-        m_weight_avg, m_sleep_avg, m_cond_summary, m_task_done_count,
+        m_habit_scores, m_habit_score_total,
+        m_weight_avg, m_sleep_avg, m_cond_summary, m_habit_done_count,
     )
 else:
     monthly_summaries, monthly_analysis = [], ""
@@ -2239,9 +2217,9 @@ else:
         '</script>'
     )
 
-if w_score_total >= 80:
+if w_habit_score_total >= 80:
     w_judge_label, w_judge_color = "🏻絶好調", "green"
-elif w_score_total >= 50:
+elif w_habit_score_total >= 50:
     w_judge_label, w_judge_color = "📈成長中", "amber"
 else:
     w_judge_label, w_judge_color = "🔧要改善", "red"
@@ -2255,8 +2233,8 @@ w_judge_text_c, w_judge_border = w_judge_colors[w_judge_color]
 
 if RUN_WEEKLY:
     weekly_summaries, weekly_analysis = generate_weekly_comment(
-        w_score_w, w_score_c, w_score_ca, w_score_i, w_score_total,
-        w_weight_avg, w_sleep_avg, w_cond_summary, task_done_count,
+        w_habit_scores, w_habit_score_total,
+        w_weight_avg, w_sleep_avg, w_cond_summary, habit_done_count,
     )
 else:
     weekly_summaries, weekly_analysis = [], ""
@@ -2380,15 +2358,21 @@ else:
     )
 
 
-def weekly_task_card(name, subtitle, icon_svg, color, score, task_rows_list, group_routine=False, done_count=None):
-    counts = done_count if done_count is not None else task_done_count
+def weekly_task_card(name, subtitle, icon_svg, color, score, task_rows_list, group_routine=False, done_count=None, emoji=None):
+    counts = done_count if done_count is not None else habit_done_count
     color_map = {
-        "green": ("text-green-400", "bg-green-500/10 border-green-500/20", "border-ark-border",   "from-green-600 to-emerald-400"),
-        "amber": ("text-amber-400", "bg-amber-500/10 border-amber-500/20", "border-amber-500/20", "from-amber-500 to-yellow-400"),
-        "rose":  ("text-rose-400",  "bg-rose-500/10 border-rose-500/20",   "border-rose-500/25",  "from-rose-600 to-red-400"),
-        "sky":   ("text-sky-400",   "bg-sky-500/10 border-sky-500/20",     "border-sky-500/20",   "from-sky-500 to-cyan-400"),
+        "green":  ("text-green-400",  "bg-green-500/10 border-green-500/20",   "border-ark-border",   "from-green-600 to-emerald-400"),
+        "amber":  ("text-amber-400",  "bg-amber-500/10 border-amber-500/20",   "border-amber-500/20", "from-amber-500 to-yellow-400"),
+        "rose":   ("text-rose-400",   "bg-rose-500/10 border-rose-500/20",     "border-rose-500/25",  "from-rose-600 to-red-400"),
+        "sky":    ("text-sky-400",    "bg-sky-500/10 border-sky-500/20",       "border-sky-500/20",   "from-sky-500 to-cyan-400"),
+        "purple": ("text-violet-400", "bg-violet-500/10 border-violet-500/20", "border-violet-500/20", "from-violet-600 to-purple-400"),
+        "blue":   ("text-blue-400",   "bg-blue-500/10 border-blue-500/20",     "border-blue-500/20",  "from-blue-600 to-sky-400"),
     }
     text_c, icon_wrap, card_border, bar_grad = color_map[color]
+    score_disp = "-" if score is None else str(score)
+    bar_width  = "0" if score is None else str(score)
+    score_suffix = "" if score is None else '<span class="text-sm text-ark-muted font-normal">/100点</span>'
+    icon_inner = f'<span class="text-base leading-none">{emoji}</span>' if emoji else f'<span class="{text_c}">{icon_svg}</span>'
     if group_routine:
         rows_html = routine_weekly_task_rows_html(task_rows_list, counts)
     else:
@@ -2407,33 +2391,42 @@ def weekly_task_card(name, subtitle, icon_svg, color, score, task_rows_list, gro
         '<div class="flex items-start justify-between mb-3">'
         '<div class="flex items-center gap-2.5">'
         '<div class="w-8 h-8 rounded-xl ' + icon_wrap + ' border flex items-center justify-center flex-shrink-0">'
-        '<span class="' + text_c + '">' + icon_svg + '</span>'
+        + icon_inner +
         '</div>'
         '<div>'
         '<p class="text-xs font-black ' + text_c + ' tracking-[.15em]">' + name + '</p>'
         '<p class="text-xs text-white/50">' + subtitle + '</p>'
         '</div></div>'
-        '<p class="text-xl font-black ' + text_c + '">' + str(score) + '<span class="text-sm text-ark-muted font-normal">/100点</span></p>'
+        '<p class="text-xl font-black ' + text_c + '">' + score_disp + score_suffix + '</p>'
         '</div>'
         '<div class="mb-3"><div class="h-1.5 bg-ark-dim rounded-full overflow-hidden">'
-        '<div class="h-full rounded-full bg-gradient-to-r ' + bar_grad + ' bar" style="width:' + str(score) + '%"></div>'
+        '<div class="h-full rounded-full bg-gradient-to-r ' + bar_grad + ' bar" style="width:' + bar_width + '%"></div>'
         '</div></div>'
         + rows_html
         + '</div>'
     )
 
-weekly_cards_html = (
-    weekly_task_card(BADGE_BY_KEY["W"],  SUBTITLE_BY_KEY["W"],  ICON_W,  CATEGORY_BY_KEY["W"]["color"],  w_score_w,  weekly_task_rows["W"],  group_routine=True) +
-    weekly_task_card(BADGE_BY_KEY["C"],  SUBTITLE_BY_KEY["C"],  ICON_C,  CATEGORY_BY_KEY["C"]["color"],  w_score_c,  weekly_task_rows["C"],  ) +
-    weekly_task_card(BADGE_BY_KEY["Ca"], SUBTITLE_BY_KEY["Ca"], ICON_CA, CATEGORY_BY_KEY["Ca"]["color"], w_score_ca, weekly_task_rows["Ca"], ) +
-    weekly_task_card(BADGE_BY_KEY["I"],  SUBTITLE_BY_KEY["I"],  ICON_I,  CATEGORY_BY_KEY["I"]["color"],  w_score_i,  weekly_task_rows["I"],  )
+weekly_cards_html = "".join(
+    weekly_task_card(
+        cat["label"], cat["subtitle"], "", cat["color"],
+        w_habit_scores[cat["key"]],
+        weekly_habit_task_rows[cat["key"]],
+        group_routine=True,
+        emoji=cat["emoji"],
+    )
+    for cat in HABIT_CATEGORIES
 )
 
-monthly_cards_html = (
-    weekly_task_card(BADGE_BY_KEY["W"],  SUBTITLE_BY_KEY["W"],  ICON_W,  CATEGORY_BY_KEY["W"]["color"],  m_score_w,  monthly_task_rows["W"],  group_routine=True, done_count=m_task_done_count) +
-    weekly_task_card(BADGE_BY_KEY["C"],  SUBTITLE_BY_KEY["C"],  ICON_C,  CATEGORY_BY_KEY["C"]["color"],  m_score_c,  monthly_task_rows["C"],  done_count=m_task_done_count) +
-    weekly_task_card(BADGE_BY_KEY["Ca"], SUBTITLE_BY_KEY["Ca"], ICON_CA, CATEGORY_BY_KEY["Ca"]["color"], m_score_ca, monthly_task_rows["Ca"], done_count=m_task_done_count) +
-    weekly_task_card(BADGE_BY_KEY["I"],  SUBTITLE_BY_KEY["I"],  ICON_I,  CATEGORY_BY_KEY["I"]["color"],  m_score_i,  monthly_task_rows["I"],  done_count=m_task_done_count)
+monthly_cards_html = "".join(
+    weekly_task_card(
+        cat["label"], cat["subtitle"], "", cat["color"],
+        m_habit_scores[cat["key"]],
+        monthly_habit_task_rows[cat["key"]],
+        group_routine=True,
+        done_count=m_habit_done_count,
+        emoji=cat["emoji"],
+    )
+    for cat in HABIT_CATEGORIES
 )
 
 cards_html = "".join(
@@ -2651,7 +2644,7 @@ f"{score_diff_html}</div>\n"
     + f'<div class="flex gap-3 sm:ml-auto"><div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-xs text-white/50 mb-1">体重平均</p><p class="ark-stat-num text-xl font-black text-white">' + str(w_weight_avg) + '<span class="text-xs font-normal text-ark-muted">kg</span></p></div>'
     + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-xs text-white/50 mb-1">睡眠平均</p><p class="ark-stat-num text-xl font-black text-amber-300">' + str(w_sleep_avg) + '<span class="text-xs font-normal">h</span></p></div>'
     + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[70px]"><p class="text-xs text-white/50 mb-1">体調</p><p class="ark-stat-num text-xl font-black text-white">' + w_cond_summary + '</p></div>'
-    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-xs text-white/50 mb-1">総合</p><p class="ark-stat-num text-xl font-black ' + w_judge_text_c + '">' + str(w_score_total) + '<span class="text-xs font-normal text-ark-muted">点</span></p></div>'
+    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-xs text-white/50 mb-1">総合</p><p class="ark-stat-num text-xl font-black ' + w_judge_text_c + '">' + str(w_habit_score_total) + '<span class="text-xs font-normal text-ark-muted">点</span></p></div>'
     + '</div></div></div></section>'
     + '<div class="ark-main-grid grid grid-cols-1 md:grid-cols-2 gap-5"><div class="flex flex-col gap-3">'
     + weekly_cards_html
@@ -2671,7 +2664,7 @@ f"{score_diff_html}</div>\n"
     + f'<div class="flex gap-3 sm:ml-auto"><div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-xs text-white/50 mb-1">体重平均</p><p class="ark-stat-num text-xl font-black text-white">' + str(m_weight_avg) + '<span class="text-xs font-normal text-ark-muted">kg</span></p></div>'
     + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-xs text-white/50 mb-1">睡眠平均</p><p class="ark-stat-num text-xl font-black text-amber-300">' + str(m_sleep_avg) + '<span class="text-xs font-normal">h</span></p></div>'
     + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[70px]"><p class="text-xs text-white/50 mb-1">体調</p><p class="ark-stat-num text-xl font-black text-white">' + m_cond_summary + '</p></div>'
-    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-xs text-white/50 mb-1">総合</p><p class="ark-stat-num text-xl font-black ' + m_judge_text_c + '">' + str(m_score_total) + '<span class="text-xs font-normal text-ark-muted">点</span></p></div>'
+    + f'<div class="bg-ark-dim/60 rounded-xl px-4 py-2.5 text-center min-w-[60px]"><p class="text-xs text-white/50 mb-1">総合</p><p class="ark-stat-num text-xl font-black ' + m_judge_text_c + '">' + str(m_habit_score_total) + '<span class="text-xs font-normal text-ark-muted">点</span></p></div>'
     + '</div></div></div></section>'
     + '<div class="ark-main-grid grid grid-cols-1 md:grid-cols-2 gap-5"><div class="flex flex-col gap-3">'
     + monthly_cards_html
