@@ -48,8 +48,18 @@ JOURNAL_MONTHLY_DATABASE_ID  = os.environ.get("JOURNAL_MONTHLY_DATABASE_ID", "")
 TRAINING_DATABASE_ID         = os.environ.get("TRAINING_DATABASE_ID", "")
 TOPIC_CARD_DATABASE_ID       = os.environ.get("TOPIC_CARD_DATABASE_ID", "")
 REUSE_LOG_DATABASE_ID        = os.environ.get("REUSE_LOG_DATABASE_ID", "")
-RUN_WEEKLY  = os.environ.get("RUN_WEEKLY",  "false").lower() == "true"
-RUN_MONTHLY = os.environ.get("RUN_MONTHLY", "false").lower() == "true"
+# Weekly/Monthly AIコメント生成の実行判定。
+# 環境変数で明示指定があればそれを優先（ローカル検証用）、なければ JST 日付から自動判定。
+# 設計意図: 週次は日曜のみ、月次は1日のみ生成し Claude API コストを抑える。
+def _run_flag(env_name, default_bool):
+    val = os.environ.get(env_name)
+    if val is not None:
+        return val.lower() == "true"
+    return default_bool
+
+_now = now_jst()
+RUN_WEEKLY  = _run_flag("RUN_WEEKLY",  _now.weekday() == 6)  # 月=0 ... 日=6
+RUN_MONTHLY = _run_flag("RUN_MONTHLY", _now.day == 1)
 
 HEADERS = {
     "Authorization": f"Bearer {NOTION_TOKEN}",

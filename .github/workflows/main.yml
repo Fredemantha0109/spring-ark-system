@@ -48,10 +48,8 @@ jobs:
           TRAINING_DATABASE_ID: ${{ secrets.TRAINING_DATABASE_ID }}
           TOPIC_CARD_DATABASE_ID: ${{ secrets.TOPIC_CARD_DATABASE_ID }}
           REUSE_LOG_DATABASE_ID: ${{ secrets.REUSE_LOG_DATABASE_ID }}
-          # Weekly分析: 月曜スケジュール時のみ true
-          RUN_WEEKLY: ${{ github.event.schedule == '0 22 * * 0' && 'true' || 'false' }}
-          # Monthly分析: 毎月1日スケジュール時のみ true
-          RUN_MONTHLY: ${{ github.event.schedule == '0 22 1 * *' && 'true' || 'false' }}
+          # RUN_WEEKLY / RUN_MONTHLY は generate_dashboard.py 側で JST 日付から自動判定する
+          # （週次は日曜のみ、月次は1日のみ）。ローカル検証時は環境変数で上書き可能。
         run: python generate_dashboard.py
       - name: Send LINE notification
         env:
