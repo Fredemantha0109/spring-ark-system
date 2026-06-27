@@ -2,8 +2,8 @@ name: Weekly Planner Generator
 
 on:
   schedule:
-    # 毎週日曜日のシンガポール時間 05:00 (UTC 21:00 土曜) に自動実行
-    - cron: '0 21 * * 6'
+    # 毎週日曜日のシンガポール時間 01:00 (UTC 17:00 土曜) に自動実行
+    - cron: '0 17 * * 6'
   workflow_dispatch:
     # 手動実行用ボタン（テスト用）
 
